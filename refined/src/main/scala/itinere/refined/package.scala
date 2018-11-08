@@ -38,7 +38,7 @@ package object refined {
 
   implicit class RichReads[A](val reads: Read[A]) {
     def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): Read[A Refined P] =
-      reads.pmap(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
+      reads.pmap(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)
   }
 
 }

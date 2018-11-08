@@ -28,8 +28,7 @@ trait UrlAlgebra {
   }
 
   def combineQueryStrings[A, B](first: QueryString[A], second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out]
-  def qs[A](name: String, value: Read[A], description: Option[String] = None): QueryString[A]
-  def optQs[A](name: String, value: Read[A], description: Option[String] = None): QueryString[Option[A]]
+  def qs[A](name: String, value: Read[A], description: Option[String] = None): QueryString[Option[A]]
 
   implicit class PathOps[A](first: Path[A]) {
     final def / (second: String)(implicit tupler: Tupler[A, HNil]): Path[tupler.Out] = chainPaths(first, staticPathSegment(second))

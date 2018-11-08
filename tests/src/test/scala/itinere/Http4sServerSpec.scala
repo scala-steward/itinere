@@ -1,16 +1,19 @@
 package itinere
+import cats.Show
 import cats.effect.{IO, Sync}
+import cats.implicits._
+import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{Http4sServer, Http4sServerJson}
+import itinere.http4s_server.{Http4sServer, Http4sServerJson, UriDecodeException}
 import itinere.refined._
 import org.http4s._
 import org.http4s.circe._
-import org.http4s.implicits._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
 import shapeless._
 import io.circe.literal._
+import io.circe.Error
 
 class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers with Matchers {
 
@@ -28,6 +31,18 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp must returnStatus(Status.Ok)
         resp.as[io.circe.Json] must returnValue(json"""{"message":"Mark"}""")
       }
+
+      "return http 400 bad_request" >> {
+        val resp = serve(
+          post(
+            Uri.uri("/users/register"),
+            json"""{"name": "Mark", "age": -1 }"""
+          )
+        )
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("DecodingFailure at .age: Predicate failed: (-1 > 0).")
+      }
     }
 
     "list" >> {
@@ -39,6 +54,35 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp must returnStatus(Status.Ok)
         resp.as[io.circe.Json] must returnValue(json"""[]""")
       }
+
+      "return http 400 bad_request when ageGreater is -1" >> {
+        val resp = serve(
+          get(Uri.uri("/users?ageGreater=-1"))
+        )
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Failed to decode query string ageGreater (Predicate failed: (-1 > 0).)")
+      }
+    }
+
+    "get" >> {
+      "return http 200 ok" >> {
+        val resp = serve(
+          get(Uri.uri("/users/1"))
+        )
+
+        resp must returnStatus(Status.Ok)
+        resp.as[io.circe.Json] must returnValue(json"""{"value": {"id": 1, "name": "Klaas", "age": 3}}""")
+      }
+
+      "return http 404 not_found" >> {
+        val resp = serve(
+          get(Uri.uri("/users/2"))
+        )
+
+        resp must returnStatus(Status.NotFound)
+        resp.as[io.circe.Json] must returnValue(json"""{"error": "User was not found"}""")
+      }
     }
   }
 
@@ -48,7 +92,7 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
   }
 
   private def serve(request: IO[Request[IO]]): Response[IO] =
-    request.flatMap(HttpRoutes.of(Server.handlers).orNotFound.run).unsafeRunSync()
+    request.flatMap(Server.router.run).unsafeRunSync()
 
   private def post[A](uri: Uri, body: A)(implicit E: EntityEncoder[IO, A]): IO[Request[IO]] =
     IO.pure(Request(Method.POST, uri, body = E.toEntity(body).body))
@@ -61,7 +105,12 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
 trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
 
-
+  def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
+    coproductResponseBuilder
+      .add(response(200, entity = jsonResponse(DomainResponse.success(value))))
+      .add(response(404, entity = jsonResponse(DomainResponse.notFound)))
+      .add(response(400, entity = jsonResponse(DomainResponse.badRequest)))
+      .as[DomainResponse[A]]
 
   val userRegister =
     endpoint(
@@ -72,8 +121,14 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
 
   val userList =
     endpoint(
-      request(GET, path / "users" /? (optQs("ageGreater", Read.int.refined[Positive]) & optQs("nameStartsWith", Read.string)).as[ListFilter]),
+      request(GET, path / "users" /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
       response(200, entity = jsonResponse(list(User.json)))
+    )
+
+  val userGet =
+    endpoint(
+      request(GET, path / "users" / segment("userId", Read.long) /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
+      domainResponse(User.json)
     )
 
 }
@@ -115,13 +170,35 @@ object RegisterUser {
   )
 }
 
+sealed trait DomainResponse[+A]
+object DomainResponse {
+  final case class Success[A](value: A) extends DomainResponse[A]
+  final case class BadRequest(error: String) extends DomainResponse[Nothing]
+  final case class NotFound(error: String) extends DomainResponse[Nothing]
+
+  def success[A](value: Json[A]): Json[Success[A]] = object1("Success")(Success[A](_))("value" -> member(value, _.value))
+  val badRequest: Json[BadRequest] = object1("BadRequest")(BadRequest.apply)("error" -> member(string, _.error))
+  val notFound: Json[NotFound] = object1("NotFound")(NotFound.apply)("error" -> member(string, _.error))
+}
+
 object Server extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
   override type F[A] = IO[A]
-
   override def F: Sync[IO] = Sync[IO]
 
+  override def errorHandler(error: Throwable): Response[IO] = error match {
+    case u : UriDecodeException =>
+      Response(Status.BadRequest).withEntity(u.message)
+    case MalformedMessageBodyFailure(_, Some(err: Error)) =>
+      Response(Status.BadRequest).withEntity(Show[Error].show(err))
+    case InvalidMessageBodyFailure(_, Some(err: Error)) =>
+      Response(Status.BadRequest).withEntity(Show[Error].show(err))
+    case _ =>
+      Response(Status.InternalServerError).withEntity("Internal server error")
+  }
+
   val handlers =
-    userRegister.implementedBy(r => IO.pure(Result(r.name))) orElse
-    userList.implementedBy(filter => IO.pure(List.empty))
+    userRegister.implementedBy(r => IO.pure(Result(r.name))) <+>
+    userList.implementedBy(_ => IO.pure(List.empty)) <+>
+    userGet.implementedBy { case userId :: _ :: _ => IO.pure(if(userId == 1) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }

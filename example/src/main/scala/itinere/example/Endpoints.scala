@@ -57,6 +57,6 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
 
   override def F: Sync[IO] = Sync[IO]
 
-  val handlers = register.implementedBy(r => IO.pure(Result(r.head.name) :: HNil))
+  val handlers = register.implementedBy(r => IO.pure(Result(r.name)))
 
 }
