@@ -36,6 +36,17 @@ package object refined {
       withRefined(Range(Bound(L.value, true), Bound(H.value, true)))
   }
 
+  implicit class RichLongJson(val Json: Json[Long]) {
+    private def withRefined[P](bound: Range)(implicit V: Validate[Long, P], R: RefType[Refined]): Json[Long Refined P] =
+      new Json[Refined[Long, P]] {
+        override def apply[F[_] : JsonAlgebra]: F[Refined[Long, P]] =
+          JsonAlgebra[F].pmap(JsonAlgebra[F].long(bound))(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
+      }
+
+    def positive[N <: Int](implicit V: Validate.Plain[Int, Positive]): Json[Long Refined Positive] =
+      withRefined(Range(Bound(1l, true), Bound(Long.MaxValue, true)))
+  }
+
   implicit class RichReads[A](val reads: Read[A]) {
     def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): Read[A Refined P] =
       reads.pmap(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)

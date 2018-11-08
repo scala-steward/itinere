@@ -75,6 +75,15 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp.as[io.circe.Json] must returnValue(json"""{"value": {"id": 1, "name": "Klaas", "age": 3}}""")
       }
 
+      "return http 400 bad_request when segment userId is -1" >> {
+        val resp = serve(
+          get(Uri.uri("/users/-1"))
+        )
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Failed to decode segment userId (Predicate failed: (-1 > 0).)")
+      }
+
       "return http 404 not_found" >> {
         val resp = serve(
           get(Uri.uri("/users/2"))
@@ -127,7 +136,7 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
 
   val userGet =
     endpoint(
-      request(GET, path / "users" / segment("userId", Read.long) /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
+      request(GET, path / "users" / segment("userId", Read.long.refined[Positive]) /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
       domainResponse(User.json)
     )
 
@@ -151,13 +160,13 @@ final case class RegisterUser(
 )
 
 final case class User(
-  id: Long,
+  id: Long Refined Positive,
   name: String,
   age: Int Refined Positive
 )
 object User {
   val json: Json[User] = object3("User")(User.apply)(
-    "id" -> member(long, _.id),
+    "id" -> member(long.positive, _.id),
     "name" -> member(string, _.name),
     "age" -> member(int.positive, _.age)
   )
@@ -199,6 +208,6 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   val handlers =
     userRegister.implementedBy(r => IO.pure(Result(r.name))) <+>
     userList.implementedBy(_ => IO.pure(List.empty)) <+>
-    userGet.implementedBy { case userId :: _ :: _ => IO.pure(if(userId == 1) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
+    userGet.implementedBy { case userId :: _ :: _ => IO.pure(if(userId.value == 1l) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }

@@ -18,7 +18,6 @@ trait Http4sServerUrl extends UrlAlgebra {
   sealed trait UriDecodeResult[+A] { self =>
 
     def toOptionT[F[_], B >: A](implicit F: Sync[F]): OptionT[F, B] = self match {
-      //TODO: how can we be sure the url is fully decoded?
       case UriDecodeResult.Matched(result, uri)       => if(uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
       case UriDecodeResult.Fatal(err, cause)          => OptionT.liftF[F, B](F.raiseError(UriDecodeException(err, cause)))
       case UriDecodeResult.NotMatched(error)          => OptionT.none[F, B]
