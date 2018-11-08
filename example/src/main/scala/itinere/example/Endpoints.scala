@@ -16,7 +16,6 @@ import shapeless._
 trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
 
 
-
   val register =
     endpoint(request(POST, path / "users" / "register", entity = jsonRequest(RegisterUser.json)), response(200, entity = jsonResponse(Result.json)))
 

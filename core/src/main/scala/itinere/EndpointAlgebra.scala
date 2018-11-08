@@ -6,17 +6,13 @@ import shapeless._
 
 import scala.util.Try
 
-trait EndpointAlgebra {
-  type Request[A]
-  type Response[A]
-  type Endpoint[A, B]
 
-  def endpoint[A, B](request: Request[A], response: Response[B], description: Option[String] = None): Endpoint[A, B]
-}
+trait HttpEndpointAlgebra extends HttpRequestAlgebra with HttpResponseAlgebra {
+  type HttpRequest[A]
+  type HttpResponse[A]
+  type HttpEndpoint[A, B]
 
-trait HttpEndpointAlgebra extends EndpointAlgebra with HttpRequestAlgebra with HttpResponseAlgebra {
-  type Request[A] = HttpRequest[A]
-  type Response[A] = HttpResponse[A]
+  def endpoint[A, B](request: HttpRequest[A], response: HttpResponse[B], description: Option[String] = None): HttpEndpoint[A, B]
 }
 
 

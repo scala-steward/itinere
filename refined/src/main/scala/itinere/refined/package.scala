@@ -36,9 +36,9 @@ package object refined {
       withRefined(Range(Bound(L.value, true), Bound(H.value, true)))
   }
 
-//  implicit class RichReads[A](val reads: Read[A]) {
-//    def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): Read[A Refined P] =
-//      reads.pmap(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
-//  }
+  implicit class RichReads[A](val reads: Read[A]) {
+    def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): Read[A Refined P] =
+      reads.pmap(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
+  }
 
 }

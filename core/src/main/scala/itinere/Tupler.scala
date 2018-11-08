@@ -4,7 +4,7 @@ import shapeless._
 import shapeless.ops.hlist.{Prepend, Split}
 
 trait Tupler[A, B] {
-  type Out <: HList
+  type Out
   def apply(a: A, b: B): Out
   def unapply(out: Out): (A, B)
 }
@@ -55,21 +55,21 @@ trait Tupler2 extends Tupler1 {
 
 trait Tupler3 extends Tupler2 {
 
-  implicit def leftUnit[A]: Aux[HNil, A, A :: HNil] = new Tupler[HNil, A] {
-    type Out = A :: HNil
-    def apply(a: HNil, b: A): A :: HNil = b :: HNil
-    override def unapply(out: ::[A, HNil]): (HNil, A) = HNil -> out.head
+  implicit def leftUnit[A]: Aux[HNil, A, A] = new Tupler[HNil, A] {
+    type Out = A
+    def apply(a: HNil, b: A): A = b
+    override def unapply(out: A): (HNil, A) = HNil -> out
   }
 
 }
 
 trait Tupler4 extends Tupler3 {
 
-  implicit def rightUnit[A]: Aux[A, HNil, A :: HNil] = new Tupler[A, HNil] {
-    type Out = A :: HNil
-    def apply(a: A, b: HNil): A :: HNil = a :: HNil
+  implicit def rightUnit[A]: Aux[A, HNil, A] = new Tupler[A, HNil] {
+    type Out = A
+    def apply(a: A, b: HNil): A  = a
 
-    override def unapply(out: ::[A, HNil]): (A, HNil) = out.head -> HNil
+    override def unapply(out: A): (A, HNil) = out -> HNil
   }
 
 }

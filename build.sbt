@@ -35,7 +35,8 @@ val `http4s-server` = project
   )
   .dependsOn(core)
 
-val circe = project.in(file("circe"))
+val circe = project
+  .in(file("circe"))
   .settings(commonSettings("circe"))
   .settings(publishSettings)
   .settings(
@@ -61,10 +62,14 @@ val tests = project
   .settings(commonSettings("tests"))
   .settings(
     libraryDependencies ++= Seq(
+      "org.http4s" %% "http4s-circe" % "0.20.0-M2" % Test,
+      "io.circe" %% "circe-literal" % "0.10.0" % Test,
+      "org.specs2" %% "specs2-core" % "4.3.4" % Test,
+      "org.specs2" %% "specs2-cats" % "4.3.5-78abffa2e-20181150936" % Test,
       "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
     )
   )
-  .dependsOn(core, refined)
+  .dependsOn(core, `http4s-server`, circe, refined)
 
 val docs = project
   .in(file("docs"))
@@ -205,9 +210,8 @@ val coverageAlias = "clean" :: "coverage" :: "tests/test" :: "coverageReport" ::
 val testAlias = "clean" :: "tests/test" :: Nil
 
 cmdAlias("validateTest", dependencyDeclarationAlias ++ testAlias)
-cmdAlias("validateCoverage", dependencyDeclarationAlias ++ coverageAlias)
+cmdAlias("validateCoverage", coverageAlias)
 cmdAlias("depdecl", dependencyDeclarationAlias)
-cmdAlias("coverage", coverageAlias)
 
 val root = project
   .in(file("."))
