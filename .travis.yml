@@ -1,12 +1,63 @@
 language: scala
+sudo: required
+services:
+- docker
 git:
   depth: 9999
 scala:
-- 2.12.7
+- 2.11.12
+- 2.12.6
 jdk:
+- oraclejdk7
 - oraclejdk8
+matrix:
+  exclude:
+  - scala: 2.12.6
+    jdk: oraclejdk7
+  - scala: 2.11.12
+    jdk: oraclejdk8
+before_install:
+- export PATH=${PATH}:./vendor/bundle
+- sudo apt-cache madison docker-engine
+- sudo apt-get -o Dpkg::Options::="--force-confnew" install -y docker-ce
+- sudo rm /usr/local/bin/docker-compose
+- curl -L https://github.com/docker/compose/releases/download/1.17.1/docker-compose-`uname
+  -s`-`uname -m` > docker-compose
+- sudo chmod +x docker-compose
+- sudo mv docker-compose /usr/local/bin
+- sudo sysctl -w vm.max_map_count=262144
+- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then openssl aes-256-cbc -K $encrypted_f5dd5ea7c332_key
+  -iv $encrypted_f5dd5ea7c332_iv -in travis/secrets.tar.enc -out travis/secrets.tar
+  -d; tar xv -C travis -f travis/secrets.tar; fi
+script:
+- sudo service docker restart
+- docker-compose up -d
+- sbt coverage "tests/test" coverageReport
+- docker-compose down
+- codecov
 install:
 - pip install --user codecov
-script:
-- sbt coverage "tests/test" coverageReport
-- codecov
+- rvm use 2.2.8 --install --fuzzy
+- gem update --system
+- gem install sass
+- gem install jekyll -v 3.2.1
+cache:
+  directories:
+  - "$HOME/.sbt/0.13/dependency"
+  - "$HOME/.sbt/boot/scala*"
+  - "$HOME/.sbt/launchers"
+  - "$HOME/.ivy2/cache"
+before_cache:
+- du -h -d 1 $HOME/.ivy2/cache
+- du -h -d 2 $HOME/.sbt/
+- find $HOME/.sbt -name "*.lock" -type f -delete
+- find $HOME/.ivy2/cache -name "ivydata-*.properties" -type f -delete
+after_success:
+- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then sbt ++$TRAVIS_SCALA_VERSION releaseEarly;
+  fi
+env:
+  global:
+  - DOCKER_VERSION=1.12.2-0~trusty
+  - secure: Uu8kuD68TxrzoMZ/9IlP6mkxvzYzobKMHcDNFMSevvReJRPtoreVR53bIUoYPdMzo9+5PFUcTFerStQ5E/HRhZm5OK3YjGwDRXSjShKuxUbVMYHJSdk1t9IORfuGIoC4GwXkW6/lzefYtnpDZ8Vm3sdLXjGLN7rT3jfpPhCZx6wKvPP2dy3om50le/YrIC6gugWMSdp3o6+dPZEOSB77BtrWjacbCyPUZ87xv1aeXgJYbvP6bmhwSjAFV5y6cY5ddXO/dkSZgDda3uzlWZc7uq8XOs7f9rj2UOdweMVm37JE7ejt55dWrG9G8ZHQJwt8jE1SiFnBxWxDBZnX3nsT+L/bqXN6y8rTK37Vo5cO6ipYzjE7o9M+zTUpgQr+71Loemh13imuluxbBq9HH31dbjmFhh3Ob0CSYJgY6hEkcR/H1oFV0EDOoU6J8uqGA/6Md89/BYMNmrjvCeLMeWYNjcmyZeZWZ571h/79pEe0DiSAUyDBtkhXWNf8A+TzrU3EAc9jKMrkje4xY+CpPSUTZAL2K/azUK+tZ8T5IpGLZ7MYD+yf/EwQqba3qFoHGnmP1xySC6TkhrFR2ILaMuB/OYtb+5qpZ+LJpgMJeGvtFvUoUvi3xqBSb1/sK0vKcBsoaghmxSvO0nhVZc6Kv7QZUFsHHuWHLV2L0sJ8xlKSC68=
+  - secure: JBEFzZRWCR1aAwe/7U/T6xFZHH+xfNcND2i53Z92bFCxZDX4xFcT+/zwKAqoDmZA5p9cL7JesiVtk033wwOxEc1pVhViHVE8wHTd63vXyV7cZDYLB7E3LWKs7SxA4einZdGpJogGLy1zxHD04EZdjpz/ewgwDAT0DiG8wymbvj+tWp2RPogSInth+0ZWI1c+7VriGfMwQckXOREZ7IirNABUY3CFB3ZfEp58OLiCXUNx9b/Hqh5bFlPGz3LikV9CtSDCHkAhrnufFVbya5vmmDUuA1SnFCGAPrpFdlDbVfyzXMaHjtdIxcslbI5E3b2BFreckoQbWBCyskd8tWC3aNJ43R9le3DdAlsebUi3//oRmIiV6FUHlncHp78zpRnFhd2Sm1PSc2eJPnfDq91ClLiCv6FVB77O+i9pAluSz+LjwHz5ccSK3jHPKf/u9aZoVPMWEbtvnnCJJ6Qbjv2fhqocU/BD2uodi8e9XPhbPwE1VYp/tzyH/QlnzfbGul8LS7Y7Sb07nHKHXw83WAzQKCW+rphICAbHPPnzdiZjveFfkuF6Mb/wqq7PDeJmKX5TZLfUqPh3DdL64/7tkrWBYw/oj+I3j19v2XCdYwY+UpULGTxwcgYsCpc9Dnnt2+CQk6WqaI2lWFQ3lxi0DF2QXF6reGX0vpzIklWumSNJlxE=
+  - secure: Lo15rdXgrNYmeCwJqIaNSDJwz+fjk+2X0gaxXVM93JJpp1NK9CZKoAyjmo1WCpVR6UGvc9JTxWxIwO5TA/oI9yiHsNKikyyAV8hBcjBWpJV6nJeJ6uzv44UYVbncKPV5HBenUBrSzfCWDYd1w3L1bWWaH4pi7oleaPwrqLcxUfZ8sr9ZZKeswBWybc8FXdrrxxB+6suxI5itZl9yU4iQ8YZOR3B4MHoOyBtT+TddHqUDOYJc5Wnc20RBmti+K71+FhHPuLc6U8P9zSpmWcwb8yL/E+oZzGILMUxWGF1ZOWGgy4MrFK0XNjy7odUvnfSi/Mev2JY8Ftp3klRL0e7xYf7yCsMJvtm16asxo4wWDGVh4uZVXO879OfG+TGgFr04+eGwEros+RK4CyeRqlv1YZG7/XR7JTZVnjmAZR2UoeeC2XgZTNKhvnxFi7nkySvVEOX0shsJOSXknAusYvmBnMprVEhNp4HWhq0wn+phE9dQtpL/6jyZDjbzkde2Zx7ecLJNYNz4O37zp0BWlyIxScSWeSqxKZG94ElX2TlPVjqk7em+yihJJBtvjLOEzr1vuMo6DgR+fC4+czZJ4t1laZ2ciShGEbMQa8wkvvxxzbOSVouNBeJfK1nksAzB7IpRMPDen52lvr2YlVCnuO5p9Bso8SujAV7o6OX0dIpMDQs=

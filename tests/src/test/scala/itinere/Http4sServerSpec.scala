@@ -10,7 +10,7 @@ import eu.timepit.refined.types.numeric.{PosInt, PosLong}
 import io.circe.Error
 import io.circe.literal._
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{Http4sServer, Http4sServerJson, UriDecodeFailure}
+import itinere.http4s_server.{HeaderDecodeFailure, Http4sServer, Http4sServerJson, UriDecodeFailure}
 import itinere.refined._
 import org.http4s._
 import org.http4s.circe._
@@ -56,7 +56,7 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
     "get" >> {
       "return http 200 ok" >> {
         val resp = serve(
-          get(Uri.uri("/users/1"))
+          get(Uri.uri("/users/1"), Header("X-Token", "23") :: Nil)
         )
 
         resp must returnStatus(Status.Ok)
@@ -64,17 +64,24 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
       }
 
       "return http 400 bad_request when segment userId is -1" >> {
-        val resp = serve(get(Uri.uri("/users/-1")))
+        val resp = serve(get(Uri.uri("/users/-1"), Header("X-Token", "23") :: Nil))
 
         resp must returnStatus(Status.BadRequest)
         resp.as[String] must returnValue("Failed to decode segment userId: Predicate failed: (-1 > 0).")
       }
 
       "return http 404 not_found" >> {
-        val resp = serve(get(Uri.uri("/users/2")))
+        val resp = serve(get(Uri.uri("/users/2"), Header("X-Token", "23") :: Nil))
 
         resp must returnStatus(Status.NotFound)
         resp.as[io.circe.Json] must returnValue(json"""{"error": "User was not found"}""")
+      }
+
+      "return http 400 bad_request when X-Token is not a int" >> {
+        val resp = serve(get(Uri.uri("/users/2"), Header("X-Token", "this-is-astring") :: Nil))
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Failed to decode header 'X-Token': For input string: \"this-is-astring\"")
       }
     }
   }
@@ -90,8 +97,8 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
   private def post[A](uri: Uri, body: A)(implicit E: EntityEncoder[IO, A]): IO[Request[IO]] =
     IO.pure(Request(Method.POST, uri, body = E.toEntity(body).body))
 
-  private def get[A](uri: Uri): IO[Request[IO]] =
-    IO.pure(Request(Method.GET, uri))
+  private def get[A](uri: Uri, headers: List[Header] = Nil): IO[Request[IO]] =
+    IO.pure(Request(Method.GET, uri, headers = Headers(headers)))
 }
 
 
@@ -109,16 +116,15 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
     POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
       response(HttpStatus.Ok, entity = jsonResponse(Json.string))
 
-
-
-
   val userList =
     GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
       response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
   val userGet =
-    GET(path / "users" / segment("userId", _.long.refined[Positive]) /? (qs("ageGreater", _.int.refined[Positive]) & qs("nameStartsWith", _.string)).as[ListFilter]) ~>
+    GET(path / "users" / segment("userId", _.long.refined[Positive]), requestHeader("X-Token", _.int.refined[Positive])) ~>
       domainResponse(User.json)
+
+
 
 }
 
@@ -170,6 +176,8 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   override def errorHandler(error: Throwable): Response[IO] = error match {
     case u : UriDecodeFailure =>
       Response(Status.BadRequest).withEntity(u.message)
+    case u : HeaderDecodeFailure =>
+      Response(Status.BadRequest).withEntity(u.message)
     case MalformedMessageBodyFailure(_, Some(err: Error)) =>
       Response(Status.BadRequest).withEntity(Show[Error].show(err))
     case InvalidMessageBodyFailure(_, Some(err: Error)) =>
@@ -182,6 +190,6 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   val handlers =
     userRegister.implementedBy(r => IO.pure(r.name)) <+>
     userList.implementedBy(_ => IO.pure(List.empty)) <+>
-    userGet.implementedBy { case userId :: _ :: _ => IO.pure(if(userId.value == 1l) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
+    userGet.implementedBy { case userId :: token :: _ => IO.pure(if(userId.value == 1l) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }

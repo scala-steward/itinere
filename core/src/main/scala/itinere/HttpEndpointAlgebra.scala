@@ -24,8 +24,8 @@ trait UrlAlgebra {
   type QueryStringValue[A]
   type Segment[A]
 
-  protected def QSV: Primitives[QueryStringValue]
-  protected def S: Primitives[Segment]
+  protected def QueryStringValue: Primitives[QueryStringValue]
+  protected def Segment: Primitives[Segment]
 
   implicit class QueryStringOps[A](first: QueryString[A]) {
     final def & [B](second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =

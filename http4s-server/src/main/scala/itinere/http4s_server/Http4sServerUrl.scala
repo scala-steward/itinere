@@ -76,8 +76,8 @@ trait Http4sServerUrl extends UrlAlgebra {
   type QueryStringValue[A] = Read[A]
   type Segment[A] = Read[A]
 
-  protected def QSV: Primitives[Read] = ReadPrimitives
-  protected def S: Primitives[Read] = ReadPrimitives
+  protected def QueryStringValue: Primitives[Read] = ReadPrimitives
+  protected def Segment: Primitives[Read] = ReadPrimitives
 
   override def combineQueryStrings[A, B](first: QueryString[A], second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
     first.flatMap(a => second.map(b => tupler(a, b)))
@@ -86,7 +86,7 @@ trait Http4sServerUrl extends UrlAlgebra {
     override def decode(uri: Uri): UriDecodeResult[Option[A]] =
       uri.query.params.get(name) match {
         case None    => UriDecodeResult.Matched(None, uri, List.empty)
-        case Some(v) => f(QSV).fromString(v) match {
+        case Some(v) => f(QueryStringValue).fromString(v) match {
           case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri, List.empty)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode query string $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode query string $name : $err", None)
@@ -111,7 +111,7 @@ trait Http4sServerUrl extends UrlAlgebra {
       val path = uri.path.split('/')
 
       path.headOption.fold[UriDecodeResult[A]](UriDecodeResult.NoMatch) { s =>
-        segment(S).fromString(s) match {
+        segment(Segment).fromString(s) match {
           case Attempt.Success(vv)     => UriDecodeResult.Matched(vv, uri.copy(path = path.tail.mkString("/")), s":$name" :: Nil)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode segment $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode segment $name : $err", None)
