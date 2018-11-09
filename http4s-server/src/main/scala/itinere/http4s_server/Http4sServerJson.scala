@@ -7,14 +7,11 @@ import itinere.{Attempt, HttpJsonAlgebra, Json, JsonLike}
 import org.http4s.{DecodeResult, MalformedMessageBodyFailure, MediaRange, Message}
 
 trait Http4sServerJson extends HttpJsonAlgebra { self: Http4sServer with JsonLike =>
-  override def jsonResponse[A](
-    json: Json[A],
-    description: Option[String]
-  ): HttpResponseEntity[A] = new HttpResponseEntity[A] {
+
+  override def jsonResponse[A](json: Json[A], description: Option[String]): HttpResponseEntity[A] = new HttpResponseEntity[A] {
     override def apply(entity: A): fs2.Stream[F, Byte] =
       Stream[F, String](jsonEncoder(json).encode(entity)) through text.utf8Encode
   }
-
 
   override def jsonRequest[A](json: Json[A], description: Option[String]): HttpRequestEntity[A] = new HttpRequestEntity[A] {
     override def decode(msg: Message[F], strict: Boolean): DecodeResult[F, A] = EitherT {
@@ -28,7 +25,6 @@ trait Http4sServerJson extends HttpJsonAlgebra { self: Http4sServer with JsonLik
       })
     }
 
-    override def consumes
-      : Set[MediaRange] = Set(MediaRange.`application/*`)
+    override def consumes: Set[MediaRange] = Set(MediaRange.`application/*`)
   }
 }

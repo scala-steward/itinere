@@ -1,11 +1,11 @@
 package itinere.http4s_server
 
 
-import cats.data.OptionT
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Sync
 import cats.implicits._
 import cats.{Invariant, Monad}
-import itinere.{Attempt, Read, Tupler, UrlAlgebra}
+import itinere.{Attempt, Read, ReadPrimitives, Tupler, UrlAlgebra}
 import org.http4s._
 import shapeless.HNil
 
@@ -13,26 +13,38 @@ final case class UriDecodeException(error: String, cause: Option[Throwable]) ext
   def message: String = cause.fold(error)(exception => s"$error (${exception.getMessage})")
 }
 
-trait Http4sServerUrl extends UrlAlgebra {
+trait Http4sServerUrl extends UrlAlgebra { self: ReadPrimitives =>
 
   sealed trait UriDecodeResult[+A] { self =>
 
     def toOptionT[F[_], B >: A](implicit F: Sync[F]): OptionT[F, B] = self match {
-      case UriDecodeResult.Matched(result, uri)       => if(uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
+      case UriDecodeResult.Matched(result, uri, _)    => if(uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
       case UriDecodeResult.Fatal(err, cause)          => OptionT.liftF[F, B](F.raiseError(UriDecodeException(err, cause)))
-      case UriDecodeResult.NotMatched(error)          => OptionT.none[F, B]
+      case UriDecodeResult.NoMatch                    => OptionT.none[F, B]
     }
 
     def map[B](f: A => B): UriDecodeResult[B] = self match {
-      case UriDecodeResult.NotMatched(err) => UriDecodeResult.NotMatched(err)
-      case UriDecodeResult.Matched(v, remainder) => UriDecodeResult.Matched(f(v), remainder)
+      case UriDecodeResult.NoMatch => UriDecodeResult.NoMatch
+      case UriDecodeResult.Matched(v, remainder, segs) => UriDecodeResult.Matched(f(v), remainder, segs)
       case UriDecodeResult.Fatal(err, cause) => UriDecodeResult.Fatal(err, cause)
+    }
+
+    def prependSegments(segments: List[String]): UriDecodeResult[A] = self match {
+      case UriDecodeResult.Matched(result, remainder, existing) => UriDecodeResult.Matched(result, remainder, segments ::: existing)
+      case UriDecodeResult.NoMatch                              => UriDecodeResult.NoMatch
+      case UriDecodeResult.Fatal(error, cause)                  => UriDecodeResult.Fatal(error, cause)
+    }
+
+    def matchedSegments: List[String] = self match {
+      case UriDecodeResult.Matched(_, _, segments) => segments
+      case UriDecodeResult.NoMatch                 => Nil
+      case UriDecodeResult.Fatal(_, _)             => Nil
     }
   }
 
   object UriDecodeResult {
-    case class Matched[A](result: A, remainder: Uri) extends UriDecodeResult[A]
-    case class NotMatched(error: String) extends UriDecodeResult[Nothing]
+    case class Matched[A](result: A, remainder: Uri, segments: List[String]) extends UriDecodeResult[A]
+    case object NoMatch extends UriDecodeResult[Nothing]
     case class Fatal(error: String, cause: Option[Throwable] = None) extends UriDecodeResult[Nothing]
   }
 
@@ -43,13 +55,13 @@ trait Http4sServerUrl extends UrlAlgebra {
   object UriDecoder {
     implicit val monad: Monad[UriDecoder] = new Monad[UriDecoder] {
       override def pure[A](x: A): UriDecoder[A] = new UriDecoder[A] {
-        override def decode(uri: Uri): UriDecodeResult[A] = UriDecodeResult.Matched(x, uri)
+        override def decode(uri: Uri): UriDecodeResult[A] = UriDecodeResult.Matched(x, uri, Nil)
       }
 
       override def flatMap[A, B](fa: UriDecoder[A])(f: (A) => UriDecoder[B]): UriDecoder[B] = new UriDecoder[B] {
         override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri) match {
-          case UriDecodeResult.Matched(v, remainder) => f(v).decode(remainder)
-          case UriDecodeResult.NotMatched(err) => UriDecodeResult.NotMatched(err)
+          case UriDecodeResult.Matched(v, remainder, segments) => f(v).decode(remainder).prependSegments(segments)
+          case UriDecodeResult.NoMatch => UriDecodeResult.NoMatch
           case UriDecodeResult.Fatal(err, cause) => UriDecodeResult.Fatal(err, cause)
         }
       }
@@ -68,12 +80,12 @@ trait Http4sServerUrl extends UrlAlgebra {
   override def combineQueryStrings[A, B](first: QueryString[A], second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
     first.flatMap(a => second.map(b => tupler(a, b)))
 
-  override def qs[A](name: String, value: Read[A], description: Option[String]): QueryString[Option[A]] = new QueryString[Option[A]] {
+  override def qs[A](name: String, description: Option[String])(implicit QSV: Primitive[A]): QueryString[Option[A]] = new QueryString[Option[A]] {
     override def decode(uri: Uri): UriDecodeResult[Option[A]] =
       uri.query.params.get(name) match {
-        case None    => UriDecodeResult.Matched(None, uri)
-        case Some(v) => value.fromString(v) match {
-          case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri)
+        case None    => UriDecodeResult.Matched(None, uri, List.empty)
+        case Some(v) => QSV.fromString(v) match {
+          case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri, List.empty)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode query string $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode query string $name : $err", None)
         }
@@ -84,21 +96,21 @@ trait Http4sServerUrl extends UrlAlgebra {
     override def decode(uri: Uri): UriDecodeResult[HNil] = {
       val path = uri.path.split('/')
 
-      path.headOption.fold[UriDecodeResult[HNil]](UriDecodeResult.NotMatched("Path is empty!"))(s =>
-        if(segment == s) UriDecodeResult.Matched(HNil, uri.copy(path = path.tail.mkString("/")))
-        else UriDecodeResult.NotMatched(s"Segment `$s` didn't equal to `$segment`")
+      path.headOption.fold[UriDecodeResult[HNil]](UriDecodeResult.NoMatch)(s =>
+        if(segment == s) UriDecodeResult.Matched(HNil, uri.copy(path = path.tail.mkString("/")), if(segment.isEmpty) Nil else segment :: Nil)
+        else UriDecodeResult.NoMatch
       )
     }
 
   }
 
-  override def segment[A](name: String, value: Read[A], description: Option[String]): Path[A] = new Path[A] {
+  override def segment[A](name: String, description: Option[String])(implicit S: Primitive[A]): Path[A] = new Path[A] {
     override def decode(uri: Uri): UriDecodeResult[A] = {
       val path = uri.path.split('/')
 
-      path.headOption.fold[UriDecodeResult[A]](UriDecodeResult.NotMatched("Path is empty!")) { s =>
-        value.fromString(s) match {
-          case Attempt.Success(vv)     => UriDecodeResult.Matched(vv, uri.copy(path = path.tail.mkString("/")))
+      path.headOption.fold[UriDecodeResult[A]](UriDecodeResult.NoMatch) { s =>
+        S.fromString(s) match {
+          case Attempt.Success(vv)     => UriDecodeResult.Matched(vv, uri.copy(path = path.tail.mkString("/")), s":$name" :: Nil)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode segment $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode segment $name : $err", None)
         }

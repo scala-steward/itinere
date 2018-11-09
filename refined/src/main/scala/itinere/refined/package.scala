@@ -46,10 +46,9 @@ package object refined {
     def positive[N <: Int](implicit V: Validate.Plain[Int, Positive]): Json[Long Refined Positive] =
       withRefined(Range(Bound(1l, true), Bound(Long.MaxValue, true)))
   }
+}
 
-  implicit class RichReads[A](val reads: Read[A]) {
-    def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): Read[A Refined P] =
-      reads.pmap(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)
-  }
-
+trait RefinedPrimitives extends Primitives {
+  implicit def refined[A, P](implicit P: Primitive[A], V: Validate[A, P], R: RefType[Refined]): Primitive[A Refined P] =
+    P.pmap(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)
 }

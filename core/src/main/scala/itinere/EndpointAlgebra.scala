@@ -13,11 +13,36 @@ trait HttpEndpointAlgebra extends HttpRequestAlgebra with HttpResponseAlgebra {
   type HttpEndpoint[A, B]
 
   def endpoint[A, B](request: HttpRequest[A], response: HttpResponse[B], description: Option[String] = None): HttpEndpoint[A, B]
+
+  implicit class HttpRequestOps[A](req: HttpRequest[A]) {
+    def ~>[B](resp: HttpResponse[B]): HttpEndpoint[A, B] = endpoint(req, resp)
+  }
+}
+
+trait Primitives {
+  type Primitive[A]
+
+  implicit def string: Primitive[String]
+  implicit def int: Primitive[Int]
+  implicit def long: Primitive[Long]
+
+  implicit val primitiveInvariant: Invariant[Primitive]
+  implicit val primitivePartial: Partial[Primitive]
+
+}
+
+trait ReadPrimitives extends Primitives {
+  type Primitive[A] = Read[A]
+
+  override implicit def string: Read[String] = Read.string
+  override implicit def int: Read[Int] = Read.int
+  override implicit def long: Read[Long] = Read.long
+  override implicit val primitiveInvariant: Invariant[Read] = Read.readInvariant
+  override implicit val primitivePartial: Partial[Read] = Read.readPartial
 }
 
 
-trait UrlAlgebra {
-
+trait UrlAlgebra extends Primitives {
   type QueryString[A]
   type Path[A] <: Url[A]
   type Url[A]
@@ -28,7 +53,7 @@ trait UrlAlgebra {
   }
 
   def combineQueryStrings[A, B](first: QueryString[A], second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out]
-  def qs[A](name: String, value: Read[A], description: Option[String] = None): QueryString[Option[A]]
+  def qs[A](name: String, description: Option[String] = None)(implicit QSV: Primitive[A]): QueryString[Option[A]]
 
   implicit class PathOps[A](first: Path[A]) {
     final def / (second: String)(implicit tupler: Tupler[A, HNil]): Path[tupler.Out] = chainPaths(first, staticPathSegment(second))
@@ -37,7 +62,7 @@ trait UrlAlgebra {
   }
 
   def staticPathSegment(segment: String): Path[HNil]
-  def segment[A](name: String, value: Read[A], description: Option[String] = None): Path[A]
+  def segment[A](name: String, description: Option[String] = None)(implicit S: Primitive[A]): Path[A]
   def chainPaths[A, B](first: Path[A], second: Path[B])(implicit tupler: Tupler[A, B]): Path[tupler.Out]
   val path: Path[HNil] = staticPathSegment("")
   def urlWithQueryString[A, B](path: Path[A], qs: QueryString[B])(implicit tupler: Tupler[A, B]): Url[tupler.Out]
@@ -89,11 +114,11 @@ trait HttpRequestAlgebra extends UrlAlgebra {
 
   type HttpMethod
 
-  def GET: HttpMethod
-  def PUT: HttpMethod
-  def POST: HttpMethod
-  def DELETE: HttpMethod
-  def PATCH: HttpMethod
+  def getMethod: HttpMethod
+  def putMethod: HttpMethod
+  def postMethod: HttpMethod
+  def deleteMethod: HttpMethod
+  def patchMethod: HttpMethod
 
   implicit class RichHttpRequestHeaders[A](val left: HttpRequestHeaders[A]) {
     def ~[B](right: HttpRequestHeaders[B])(implicit T: Tupler[A, B]): HttpRequestHeaders[T.Out] =
@@ -109,6 +134,14 @@ trait HttpRequestAlgebra extends UrlAlgebra {
 
   def request[A, B, C, AB](method: HttpMethod, url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)
                           (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out]
+
+  def GET[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)
+                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
+    request(getMethod, url, headers, emptyRequestEntity)
+
+  def POST[A, B, C, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)
+                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] =
+    request[A, B, C, AB](postMethod, url, headers, entity)
 
 
   implicit val httpRequestHeadersInvariantFunctor: Invariant[HttpRequestHeaders]
@@ -141,8 +174,11 @@ object Read {
   val long: Read[Long] = fromTry(s => Try(s.toLong))
   val string: Read[String] = fromString(Attempt.success)
 
-  implicit val readInstances: Partial[Read] with Invariant[Read] = new Partial[Read] with Invariant[Read] {
+  val readPartial: Partial[Read] = new Partial[Read] {
     override def pmap[A, B](fa: Read[A])(f: A => Attempt[B])(g: B => A): Read[B] = Read.fromString(str => fa.fromString(str).flatMap(f))
+  }
+
+  val readInvariant: Invariant[Read] = new Invariant[Read] {
     override def imap[A, B](fa: Read[A])(f: A => B)(g: B => A): Read[B] = Read.fromString(str => fa.fromString(str).map(f))
   }
 }

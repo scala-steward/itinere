@@ -1,10 +1,12 @@
 package itinere
+
+import cats.implicits._
 import cats.Show
 import cats.effect.{IO, Sync}
-import cats.implicits._
 import eu.timepit.refined._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import eu.timepit.refined.types.numeric.{PosInt, PosLong}
+import io.circe.Error
+import io.circe.literal._
 import itinere.circe.CirceJsonLike
 import itinere.http4s_server.{Http4sServer, Http4sServerJson, UriDecodeException}
 import itinere.refined._
@@ -12,8 +14,8 @@ import org.http4s._
 import org.http4s.circe._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
 import shapeless._
-import io.circe.literal._
-import io.circe.Error
+
+import scala.concurrent.duration.FiniteDuration
 
 class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers with Matchers {
 
@@ -29,7 +31,7 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         )
 
         resp must returnStatus(Status.Ok)
-        resp.as[io.circe.Json] must returnValue(json"""{"message":"Mark"}""")
+        resp.as[io.circe.Json] must returnValue(json""""Mark"""")
       }
 
       "return http 400 bad_request" >> {
@@ -112,7 +114,7 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
 
 
-trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
+trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPrimitives {
 
   def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
     coproductResponseBuilder
@@ -122,60 +124,47 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra {
       .as[DomainResponse[A]]
 
   val userRegister =
-    endpoint(
-      request(POST, path / "users" / "register", entity = jsonRequest(RegisterUser.json)),
-      response(200, entity = jsonResponse(Result.json))
-    )
+    POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
+      response(200, entity = jsonResponse(Json.string))
 
 
   val userList =
-    endpoint(
-      request(GET, path / "users" /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
-      response(200, entity = jsonResponse(list(User.json)))
-    )
+    GET(path / "users" /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
+      response(200, entity = jsonResponse(Json.list(User.json)))
 
   val userGet =
-    endpoint(
-      request(GET, path / "users" / segment("userId", Read.long.refined[Positive]) /? (qs("ageGreater", Read.int.refined[Positive]) & qs("nameStartsWith", Read.string)).as[ListFilter]),
+    GET(path / "users" / segment[PosLong]("userId") /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
       domainResponse(User.json)
-    )
 
 }
 
 final case class ListFilter(
-  ageGreater: Option[Int Refined Positive],
+  ageGreater: Option[PosInt],
   nameStartsWith: Option[String]
 )
 
-final case class Result(message: String)
-object Result {
-  val json: Json[Result] = object1("Result")(Result.apply)(
-    "message" -> member(string, _.message)
-  )
-}
-
 final case class RegisterUser(
    name: String,
-   age: Int Refined Positive
+   age: PosInt
 )
 
 final case class User(
-  id: Long Refined Positive,
+  id: PosLong,
   name: String,
-  age: Int Refined Positive
+  age: PosInt
 )
 object User {
-  val json: Json[User] = object3("User")(User.apply)(
-    "id" -> member(long.positive, _.id),
-    "name" -> member(string, _.name),
-    "age" -> member(int.positive, _.age)
+  val json: Json[User] = Json.object3("User")(User.apply)(
+    "id" -> member(Json.long.positive, _.id),
+    "name" -> member(Json.string, _.name),
+    "age" -> member(Json.int.positive, _.age)
   )
 }
 
 object RegisterUser {
-  val json: Json[RegisterUser] = object2("RegisterUser")(RegisterUser.apply)(
-    "name" -> member(string, _.name),
-    "age" -> member(int.positive, _.age)
+  val json: Json[RegisterUser] = Json.object2("RegisterUser")(RegisterUser.apply)(
+    "name" -> member(Json.string, _.name),
+    "age" -> member(Json.int.positive, _.age)
   )
 }
 
@@ -185,9 +174,9 @@ object DomainResponse {
   final case class BadRequest(error: String) extends DomainResponse[Nothing]
   final case class NotFound(error: String) extends DomainResponse[Nothing]
 
-  def success[A](value: Json[A]): Json[Success[A]] = object1("Success")(Success[A](_))("value" -> member(value, _.value))
-  val badRequest: Json[BadRequest] = object1("BadRequest")(BadRequest.apply)("error" -> member(string, _.error))
-  val notFound: Json[NotFound] = object1("NotFound")(NotFound.apply)("error" -> member(string, _.error))
+  def success[A](value: Json[A]): Json[Success[A]] = Json.object1("Success")(Success[A](_))("value" -> member(value, _.value))
+  val badRequest: Json[BadRequest] = Json.object1("BadRequest")(BadRequest.apply)("error" -> member(Json.string, _.error))
+  val notFound: Json[NotFound] = Json.object1("NotFound")(NotFound.apply)("error" -> member(Json.string, _.error))
 }
 
 object Server extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
@@ -206,7 +195,7 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   }
 
   val handlers =
-    userRegister.implementedBy(r => IO.pure(Result(r.name))) <+>
+    userRegister.implementedBy(r => IO.pure(r.name)) <+>
     userList.implementedBy(_ => IO.pure(List.empty)) <+>
     userGet.implementedBy { case userId :: _ :: _ => IO.pure(if(userId.value == 1l) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 

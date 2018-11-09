@@ -15,17 +15,18 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
     def decode(headers: Headers): Either[String, A]
   }
 
+
+
   type HttpRequestEntity[A] = EntityDecoder[F, A]
+  type HttpRequest[A] = Req[F] => OptionT[F, RequestMessage[A]]
+  type HttpMethod = Method
 
-  type HttpRequest[A] = Req[F] => OptionT[F, A]
 
-  override type HttpMethod = Method
-
-  override def GET = Method.GET
-  override def PUT = Method.PUT
-  override def POST = Method.POST
-  override def DELETE = Method.DELETE
-  override def PATCH = Method.PATCH
+  def getMethod: HttpMethod = Method.GET
+  def putMethod: HttpMethod = Method.PUT
+  def postMethod: HttpMethod = Method.POST
+  def deleteMethod: HttpMethod = Method.DELETE
+  def patchMethod: HttpMethod = Method.PATCH
 
   override def requestHeader[A](name: String, read: Read[A], description: Option[String]): HttpRequestHeaders[A] = new HttpRequestHeaders[A] {
     override def decode(headers: Headers): Either[String, A] =
@@ -50,11 +51,14 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
                                      headers: HttpRequestHeaders[B],
                                      entity: HttpRequestEntity[C])(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] = req => {
     if(req.method === method) {
+      val urlDecode = url.decode(req.uri)
+
       for {
-        a <- url.decode(req.uri).toOptionT
+        a <- urlDecode.toOptionT
         b <- OptionT.fromOption[F](headers.decode(req.headers).toOption) //TODO also get errors from here
         c <- OptionT.liftF(req.as[C](F, entity))
-      } yield TO.apply(T.apply(a, b), c)
+        uri = urlDecode.matchedSegments.mkString("/")
+      } yield RequestMessage(req.method, uri, TO.apply(T.apply(a, b), c))
     } else {
       OptionT.none
     }
@@ -74,7 +78,7 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
   }
   override implicit val httpRequestInvariantFunctor: Invariant[HttpRequest] = new Invariant[HttpRequest] {
     override def imap[A, B](fa: HttpRequest[A])(f: (A) => B)(g: (B) => A): HttpRequest[B] = {
-      req => fa(req).map(f)
+      req => fa(req).map(x => RequestMessage(x.method, x.uri, f(x.value)))
     }
   }
 

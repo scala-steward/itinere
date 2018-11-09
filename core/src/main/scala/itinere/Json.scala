@@ -13,11 +13,7 @@ trait Json[A] {
   def apply[F[_] : JsonAlgebra]: F[A]
 }
 
-object Json {
-  def applyAlgebra[F[_], A](avro: Json[A])(implicit F: JsonAlgebra[F]): F[A] = avro.apply[F]
-}
-
-trait JsonDsl extends JsonDslFormatN { self =>
+object Json extends JsonDslFormatN { self =>
 
   val int: Json[Int] = new Json[Int] {
     override def apply[F[_] : JsonAlgebra]: F[Int] = implicitly[JsonAlgebra[F]].int(Range(Bound(Int.MinValue, true), Bound(Int.MaxValue, true)))
