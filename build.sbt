@@ -12,6 +12,7 @@ val core = project
       "org.typelevel" %% "cats-core" % catsVersion,
       "com.chuusai" %% "shapeless" % shapelessVersion,
     ),
+    coverageExcludedPackages := "itinere.*FormatN",
     sourceGenerators in Compile += (sourceManaged in Compile)
       .map(Boilerplate.gen(Boilerplate.coreTemplates))
       .taskValue
