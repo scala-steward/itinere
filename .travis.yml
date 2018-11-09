@@ -5,6 +5,8 @@ scala:
 - 2.12.7
 jdk:
 - oraclejdk8
+install:
+- pip install --user codecov
 script:
 - sbt coverage "tests/test" coverageReport
 - codecov
