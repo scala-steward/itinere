@@ -1,0 +1,10 @@
+language: scala
+git:
+  depth: 9999
+scala:
+- 2.12.7
+jdk:
+- oraclejdk8
+script:
+- sbt coverage "tests/test" coverageReport
+- codecov
