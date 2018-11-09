@@ -4,12 +4,13 @@ import cats.implicits._
 import cats.Show
 import cats.effect.{IO, Sync}
 import eu.timepit.refined._
+import eu.timepit.refined.api.{RefType, Refined, Validate}
+import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.types.numeric.{PosInt, PosLong}
-
 import io.circe.Error
 import io.circe.literal._
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{Http4sServer, Http4sServerJson, UriDecodeException}
+import itinere.http4s_server.{Http4sServer, Http4sServerJson, UriDecodeFailure}
 import itinere.refined._
 import org.http4s._
 import org.http4s.circe._
@@ -22,24 +23,14 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
   "Server" >> {
     "register" >> {
       "return http 200 ok" >> {
-        val resp = serve(
-          post(
-            Uri.uri("/users/register"),
-            json"""{"name": "Mark", "age": 12 }"""
-          )
-        )
+        val resp = serve(post(Uri.uri("/users/register"),json"""{"name": "Mark", "age": 12 }"""))
 
         resp must returnStatus(Status.Ok)
         resp.as[io.circe.Json] must returnValue(json""""Mark"""")
       }
 
       "return http 400 bad_request" >> {
-        val resp = serve(
-          post(
-            Uri.uri("/users/register"),
-            json"""{"name": "Mark", "age": -1 }"""
-          )
-        )
+        val resp = serve(post(Uri.uri("/users/register"),json"""{"name": "Mark", "age": -1 }"""))
 
         resp must returnStatus(Status.BadRequest)
         resp.as[String] must returnValue("DecodingFailure at .age: Predicate failed: (-1 > 0).")
@@ -48,21 +39,17 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
     "list" >> {
       "return http 200 ok" >> {
-        val resp = serve(
-          get(Uri.uri("/users?ageGreater=1"))
-        )
+        val resp = serve(get(Uri.uri("/users?ageGreater=1")))
 
         resp must returnStatus(Status.Ok)
         resp.as[io.circe.Json] must returnValue(json"""[]""")
       }
 
       "return http 400 bad_request when ageGreater is -1" >> {
-        val resp = serve(
-          get(Uri.uri("/users?ageGreater=-1"))
-        )
+        val resp = serve(get(Uri.uri("/users?ageGreater=-1")))
 
         resp must returnStatus(Status.BadRequest)
-        resp.as[String] must returnValue("Failed to decode query string ageGreater (Predicate failed: (-1 > 0).)")
+        resp.as[String] must returnValue("Failed to decode query string ageGreater: Predicate failed: (-1 > 0).")
       }
     }
 
@@ -77,18 +64,14 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
       }
 
       "return http 400 bad_request when segment userId is -1" >> {
-        val resp = serve(
-          get(Uri.uri("/users/-1"))
-        )
+        val resp = serve(get(Uri.uri("/users/-1")))
 
         resp must returnStatus(Status.BadRequest)
-        resp.as[String] must returnValue("Failed to decode segment userId (Predicate failed: (-1 > 0).)")
+        resp.as[String] must returnValue("Failed to decode segment userId: Predicate failed: (-1 > 0).")
       }
 
       "return http 404 not_found" >> {
-        val resp = serve(
-          get(Uri.uri("/users/2"))
-        )
+        val resp = serve(get(Uri.uri("/users/2")))
 
         resp must returnStatus(Status.NotFound)
         resp.as[io.circe.Json] must returnValue(json"""{"error": "User was not found"}""")
@@ -127,12 +110,14 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
       response(HttpStatus.Ok, entity = jsonResponse(Json.string))
 
 
+
+
   val userList =
-    GET(path / "users" /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
+    GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
       response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
   val userGet =
-    GET(path / "users" / segment[PosLong]("userId") /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
+    GET(path / "users" / segment("userId", _.long.refined[Positive]) /? (qs("ageGreater", _.int.refined[Positive]) & qs("nameStartsWith", _.string)).as[ListFilter]) ~>
       domainResponse(User.json)
 
 }
@@ -183,7 +168,7 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   override def F: Sync[IO] = Sync[IO]
 
   override def errorHandler(error: Throwable): Response[IO] = error match {
-    case u : UriDecodeException =>
+    case u : UriDecodeFailure =>
       Response(Status.BadRequest).withEntity(u.message)
     case MalformedMessageBodyFailure(_, Some(err: Error)) =>
       Response(Status.BadRequest).withEntity(Show[Error].show(err))

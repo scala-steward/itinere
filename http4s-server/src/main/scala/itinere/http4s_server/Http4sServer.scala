@@ -6,9 +6,9 @@ import java.util.concurrent.TimeUnit
 import cats.data.{Kleisli, OptionT}
 import cats.effect.Sync
 import cats.implicits._
-import itinere.{HttpEndpointAlgebra, ReadPrimitives}
+import itinere.HttpEndpointAlgebra
 import org.http4s.implicits._
-import org.http4s.{HttpRoutes, MalformedMessageBodyFailure, Status, Request => Req, Response => Resp}
+import org.http4s.{HttpRoutes, MalformedMessageBodyFailure, Status, Response => Resp}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -16,7 +16,6 @@ abstract class Http4sServer
   extends HttpEndpointAlgebra
     with Http4sServerResponse
     with Http4sServerRequest
-    with ReadPrimitives
 {
 
   type F[A]
@@ -37,11 +36,10 @@ abstract class Http4sServer
       start <- currentTimeMillis
       res <- handler(message.value)
       end <- currentTimeMillis
-      _ <- measurementHandler(
-        RequestMessage(message.method, message.uri, FiniteDuration(end - start, TimeUnit.MILLISECONDS)))
+      _ <- measurementHandler(RequestMessage(message.method, message.uri, FiniteDuration(end - start, TimeUnit.MILLISECONDS)))
     } yield res
 
-  final def endpoint[A, B](request: Req[F] => OptionT[F, RequestMessage[A]], response: B => Resp[F], description: Option[String]): HttpEndpoint[A, B] =
+  final def endpoint[A, B](request: HttpRequest[A], response: HttpResponse[B], description: Option[String]): HttpEndpoint[A, B] =
     HttpEndpoint(request, response)
 
   def measurementHandler(message: RequestMessage[FiniteDuration]): F[Unit] = F.unit

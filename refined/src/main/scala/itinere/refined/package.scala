@@ -3,19 +3,8 @@ package itinere
 import eu.timepit.refined.api.{RefType, Refined, Validate}
 import eu.timepit.refined.numeric.Positive
 
-package object refined {
 
-//  implicit class RichStringJson(val Json: Json[String]) {
-//
-//    private def withRefined[P](description: StringDescription)(implicit V: Validate[String, P], R: RefType[Refined]): Json[String Refined P] =
-//      new Json[Refined[String, P]] {
-//        override def apply[F[_] : JsonAlgebra]: F[Refined[String, P]] =
-//          JsonAlgebra[F].pmap(JsonAlgebra[F].string(description))(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
-//      }
-//
-//    def nonEmpty[S <: String](implicit V: Validate.Plain[String, NonEmpty], R: RefType[Refined], S: Witness.Aux[S]): Json[String Refined NonEmpty] =
-//      withRefined(StringDescription.Length(LengthBound.Atleast(1)))
-//  }
+package object refined {
 
   implicit class RichIntJson(val Json: Json[Int]) {
     private def withRefined[P](bound: Range)(implicit V: Validate[Int, P], R: RefType[Refined]): Json[Int Refined P] =
@@ -40,7 +29,9 @@ package object refined {
   }
 }
 
-trait RefinedPrimitives extends Primitives {
-  implicit def refined[A, P](implicit P: Primitive[A], V: Validate[A, P], R: RefType[Refined]): Primitive[A Refined P] =
-    P.pmap(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)
+trait RefinedPrimitives { self: HttpEndpointAlgebra =>
+  implicit class RefinedSyntax[F[_], A](fa: F[A])(implicit P: Partial[F]) {
+    def refined[P](implicit V: Validate[A, P], R: RefType[Refined]): F[Refined[A, P]] =
+      P.pmap(fa)(p => Attempt.fromThrowable(R.refine(p).left.map(err => new Throwable(err))))(R.unwrap)
+  }
 }

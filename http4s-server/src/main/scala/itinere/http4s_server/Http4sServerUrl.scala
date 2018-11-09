@@ -5,21 +5,18 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Sync
 import cats.implicits._
 import cats.{Invariant, Monad}
-import itinere.{Attempt, Read, ReadPrimitives, Tupler, UrlAlgebra}
+import itinere.{Attempt, Partial, Primitives, Read, ReadPrimitives, Tupler, UrlAlgebra}
 import org.http4s._
 import shapeless.HNil
 
-final case class UriDecodeException(error: String, cause: Option[Throwable]) extends Throwable(error) {
-  def message: String = cause.fold(error)(exception => s"$error (${exception.getMessage})")
-}
 
-trait Http4sServerUrl extends UrlAlgebra { self: ReadPrimitives =>
+trait Http4sServerUrl extends UrlAlgebra {
 
   sealed trait UriDecodeResult[+A] { self =>
 
     def toOptionT[F[_], B >: A](implicit F: Sync[F]): OptionT[F, B] = self match {
       case UriDecodeResult.Matched(result, uri, _)    => if(uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
-      case UriDecodeResult.Fatal(err, cause)          => OptionT.liftF[F, B](F.raiseError(UriDecodeException(err, cause)))
+      case UriDecodeResult.Fatal(err, cause)          => OptionT.liftF[F, B](F.raiseError(UriDecodeFailure(err, cause)))
       case UriDecodeResult.NoMatch                    => OptionT.none[F, B]
     }
 
@@ -76,15 +73,20 @@ trait Http4sServerUrl extends UrlAlgebra { self: ReadPrimitives =>
   type Path[A] = UriDecoder[A]
   type Url[A] = UriDecoder[A]
   type QueryString[A] = UriDecoder[A]
+  type QueryStringValue[A] = Read[A]
+  type Segment[A] = Read[A]
+
+  protected def QSV: Primitives[Read] = ReadPrimitives
+  protected def S: Primitives[Read] = ReadPrimitives
 
   override def combineQueryStrings[A, B](first: QueryString[A], second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
     first.flatMap(a => second.map(b => tupler(a, b)))
 
-  override def qs[A](name: String, description: Option[String])(implicit QSV: Primitive[A]): QueryString[Option[A]] = new QueryString[Option[A]] {
+  override def qs[A](name: String, f: Primitives[Read] => QueryStringValue[A], description: Option[String]): QueryString[Option[A]] = new QueryString[Option[A]] {
     override def decode(uri: Uri): UriDecodeResult[Option[A]] =
       uri.query.params.get(name) match {
         case None    => UriDecodeResult.Matched(None, uri, List.empty)
-        case Some(v) => QSV.fromString(v) match {
+        case Some(v) => f(QSV).fromString(v) match {
           case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri, List.empty)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode query string $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode query string $name : $err", None)
@@ -104,12 +106,12 @@ trait Http4sServerUrl extends UrlAlgebra { self: ReadPrimitives =>
 
   }
 
-  override def segment[A](name: String, description: Option[String])(implicit S: Primitive[A]): Path[A] = new Path[A] {
+  override def segment[A](name: String, segment: Primitives[Segment] => Segment[A], description: Option[String]): Path[A] = new Path[A] {
     override def decode(uri: Uri): UriDecodeResult[A] = {
       val path = uri.path.split('/')
 
       path.headOption.fold[UriDecodeResult[A]](UriDecodeResult.NoMatch) { s =>
-        S.fromString(s) match {
+        segment(S).fromString(s) match {
           case Attempt.Success(vv)     => UriDecodeResult.Matched(vv, uri.copy(path = path.tail.mkString("/")), s":$name" :: Nil)
           case Attempt.Exception(err)  => UriDecodeResult.Fatal(s"Failed to decode segment $name", Some(err))
           case Attempt.Error(err)      => UriDecodeResult.Fatal(s"Failed to decode segment $name : $err", None)
@@ -139,4 +141,8 @@ trait Http4sServerUrl extends UrlAlgebra { self: ReadPrimitives =>
       override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri).map(f)
     }
   }
+  override implicit val queryStringValueInvariant: Invariant[Read] = Read.readInvariant
+  override implicit val queryStringValuePartial: Partial[Read] = Read.readPartial
+  override implicit val segmentInvariant: Invariant[Read] = Read.readInvariant
+  override implicit val segmentPartial: Partial[Read] = Read.readPartial
 }

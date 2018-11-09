@@ -4,14 +4,12 @@ import cats.data.EitherT
 import cats.implicits._
 import fs2.{text, _}
 import itinere.{Attempt, HttpJsonAlgebra, Json, JsonLike}
-import org.http4s.{DecodeResult, MalformedMessageBodyFailure, MediaRange, Message}
+import org.http4s.{DecodeResult, EntityEncoder, MalformedMessageBodyFailure, MediaRange, Message}
 
 trait Http4sServerJson extends HttpJsonAlgebra { self: Http4sServer with JsonLike =>
 
-  override def jsonResponse[A](json: Json[A], description: Option[String]): HttpResponseEntity[A] = new HttpResponseEntity[A] {
-    override def apply(entity: A): fs2.Stream[F, Byte] =
-      Stream[F, String](jsonEncoder(json).encode(entity)) through text.utf8Encode
-  }
+  override def jsonResponse[A](json: Json[A], description: Option[String]): HttpResponseEntity[A] =
+    EntityEncoder.stringEncoder[F].contramap(jsonEncoder(json).encode(_))
 
   override def jsonRequest[A](json: Json[A], description: Option[String]): HttpRequestEntity[A] = new HttpRequestEntity[A] {
     override def decode(msg: Message[F], strict: Boolean): DecodeResult[F, A] = EitherT {
