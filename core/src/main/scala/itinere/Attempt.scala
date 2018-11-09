@@ -13,14 +13,7 @@ sealed trait Attempt[+A] { self =>
 
 object Attempt {
   final case class Success[A](value: A) extends Attempt[A]
-  final case class Exception(error: Throwable) extends Attempt[Nothing] {
-    override def equals(obj: scala.Any): Boolean = {
-      obj match {
-        case Exception(other) => other.getMessage == error.getMessage
-        case _ => false
-      }
-    }
-  }
+  final case class Exception(error: Throwable) extends Attempt[Nothing]
   final case class Error(error: String) extends Attempt[Nothing]
 
   def exception(ex: Throwable): Attempt[Nothing] = Attempt.Exception(ex)
@@ -37,14 +30,14 @@ object Attempt {
     case Right(value) => success(value)
   }
 
-  def fromThrowable[L, R](t: Either[Throwable, R]): Attempt[R] = t match {
-    case Left(err) => exception(err)
-    case Right(value) => success(value)
-  }
-
   def fromOption[A](option: Option[A], ifEmpty: String): Attempt[A] = option match {
     case None => error(ifEmpty)
     case Some(value) => success(value)
+  }
+
+  def fromThrowable[L, R](t: Either[Throwable, R]): Attempt[R] = t match {
+    case Left(err) => exception(err)
+    case Right(value) => success(value)
   }
 
   implicit val monad: Monad[Attempt] = new Monad[Attempt] {

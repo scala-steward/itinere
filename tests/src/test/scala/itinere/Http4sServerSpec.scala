@@ -5,6 +5,7 @@ import cats.Show
 import cats.effect.{IO, Sync}
 import eu.timepit.refined._
 import eu.timepit.refined.types.numeric.{PosInt, PosLong}
+
 import io.circe.Error
 import io.circe.literal._
 import itinere.circe.CirceJsonLike
@@ -14,8 +15,6 @@ import org.http4s._
 import org.http4s.circe._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
 import shapeless._
-
-import scala.concurrent.duration.FiniteDuration
 
 class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers with Matchers {
 
@@ -118,19 +117,19 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
 
   def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
     coproductResponseBuilder
-      .add(response(200, entity = jsonResponse(DomainResponse.success(value))))
-      .add(response(404, entity = jsonResponse(DomainResponse.notFound)))
-      .add(response(400, entity = jsonResponse(DomainResponse.badRequest)))
+      .add(response(HttpStatus.Ok, entity = jsonResponse(DomainResponse.success(value))))
+      .add(response(HttpStatus.NotFound, entity = jsonResponse(DomainResponse.notFound)))
+      .add(response(HttpStatus.BadRequest, entity = jsonResponse(DomainResponse.badRequest)))
       .as[DomainResponse[A]]
 
   val userRegister =
     POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
-      response(200, entity = jsonResponse(Json.string))
+      response(HttpStatus.Ok, entity = jsonResponse(Json.string))
 
 
   val userList =
     GET(path / "users" /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
-      response(200, entity = jsonResponse(Json.list(User.json)))
+      response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
   val userGet =
     GET(path / "users" / segment[PosLong]("userId") /? (qs[PosInt]("ageGreater") & qs[String]("nameStartsWith")).as[ListFilter]) ~>
@@ -193,6 +192,7 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
     case _ =>
       Response(Status.InternalServerError).withEntity("Internal server error")
   }
+
 
   val handlers =
     userRegister.implementedBy(r => IO.pure(r.name)) <+>

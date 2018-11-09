@@ -1,13 +1,9 @@
 package itinere
 
-import java.time._
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 
 import cats.Invariant
 import shapeless.{:+:, CNil, Coproduct, Inl, Inr}
-
-import scala.util.Try
 
 trait Json[A] {
   def apply[F[_] : JsonAlgebra]: F[A]
@@ -46,22 +42,6 @@ object Json extends JsonDslFormatN { self =>
   val uuid: Json[UUID] = new Json[UUID] {
     override def apply[F[_] : JsonAlgebra]: F[UUID] = implicitly[JsonAlgebra[F]].uuid
   }
-
-  val instant: Json[Instant] = new Json[Instant] {
-    override def apply[F[_] : JsonAlgebra]: F[Instant] = implicitly[JsonAlgebra[F]].instant
-  }
-
-  //TODO: regex
-  val localDate: Json[LocalDate] =
-    string.pmap(str => Attempt.fromTry(Try(LocalDate.parse(str, DateTimeFormatter.ISO_LOCAL_DATE))))(_.format(DateTimeFormatter.ISO_LOCAL_DATE))
-
-  //TODO: regex
-  val localDateTime: Json[LocalDateTime] =
-    string.pmap(str => Attempt.fromTry(Try(LocalDateTime.parse(str, DateTimeFormatter.ISO_LOCAL_DATE_TIME))))(_.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-
-  //TODO: regex
-  val zonedDateTime: Json[ZonedDateTime] =
-    string.pmap(str => Attempt.fromTry(Try(ZonedDateTime.parse(str, DateTimeFormatter.ISO_ZONED_DATE_TIME))))(_.format(DateTimeFormatter.ISO_ZONED_DATE_TIME))
 
   def imap[A, B](fa: Json[A])(f: A => B)(g: B => A): Json[B] = new Json[B] {
     override def apply[F[_] : JsonAlgebra]: F[B] = implicitly[JsonAlgebra[F]].imap(fa.apply[F])(f)(g)

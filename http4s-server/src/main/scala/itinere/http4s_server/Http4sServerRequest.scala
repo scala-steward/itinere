@@ -1,10 +1,9 @@
 package itinere.http4s_server
 
 import cats.Invariant
-import cats.data.{EitherT, OptionT}
+import cats.data.OptionT
 import cats.implicits._
-import fs2.Stream
-import itinere.{HttpRequestAlgebra, Read, Tupler}
+import itinere.{HttpMethods, HttpRequestAlgebra, Read, Tupler}
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.{DecodeResult, EntityDecoder, Headers, MediaRange, Message, Method, Request => Req}
 import shapeless.HNil
@@ -15,18 +14,11 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
     def decode(headers: Headers): Either[String, A]
   }
 
-
-
   type HttpRequestEntity[A] = EntityDecoder[F, A]
   type HttpRequest[A] = Req[F] => OptionT[F, RequestMessage[A]]
   type HttpMethod = Method
 
-
-  def getMethod: HttpMethod = Method.GET
-  def putMethod: HttpMethod = Method.PUT
-  def postMethod: HttpMethod = Method.POST
-  def deleteMethod: HttpMethod = Method.DELETE
-  def patchMethod: HttpMethod = Method.PATCH
+  val HttpMethod: HttpMethods[Method] = Http4sMethods
 
   override def requestHeader[A](name: String, read: Read[A], description: Option[String]): HttpRequestHeaders[A] = new HttpRequestHeaders[A] {
     override def decode(headers: Headers): Either[String, A] =
@@ -81,7 +73,4 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
       req => fa(req).map(x => RequestMessage(x.method, x.uri, f(x.value)))
     }
   }
-
-  private def foldF[A, B, C](eitherT: F[Either[A, B]])(fb: B => F[C])(fa: A => F[C]): F[C] =
-    F.flatMap(eitherT)(_.fold(fa, fb))
 }

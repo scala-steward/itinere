@@ -30,8 +30,6 @@ trait CirceJsonLike extends JsonLike {
 
     override val uuid: Decoder[UUID] = Decoder.decodeUUID
 
-    override val instant: Decoder[Instant] = Decoder.decodeLong.emapTry(e => Try(Instant.ofEpochMilli(e)))
-
     override def option[A](from: Decoder[A]): Decoder[Option[A]] = Decoder.decodeOption(from)
 
     override def list[A](of: Decoder[A]): Decoder[List[A]] = Decoder.decodeList(of)
@@ -67,7 +65,6 @@ trait CirceJsonLike extends JsonLike {
     }
 
     override val uuid: Encoder[UUID] = Encoder.encodeUUID
-    override val instant: Encoder[Instant] = Encoder.encodeLong.contramap(_.toEpochMilli)
 
     override def option[A](from: Encoder[A]): Encoder[Option[A]] = Encoder.encodeOption(from)
 

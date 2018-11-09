@@ -29,49 +29,18 @@ final case class Member[F[_], A, B] private (
   def transform[G[_]](f: F ~> G): Member[G, A, B] = copy(fa = f(fa))
 }
 
-sealed trait LengthBound { self =>
-  def isCompatible(other: LengthBound): Boolean =
-    implicitly[PartialOrdering[LengthBound]]
-      .tryCompare(self, other)
-      .exists(x => x == 0 || x == 1)
-}
+sealed trait LengthBound
 
 object LengthBound {
   case object Unbounded extends LengthBound
   case class Atmost(value: Int) extends LengthBound
   case class Atleast(value: Int) extends LengthBound
   case class Interval(low: Int, high: Int) extends LengthBound
-
-  implicit val order: PartialOrdering[LengthBound] = new PartialOrdering[LengthBound] {
-    override def tryCompare(x: LengthBound, y: LengthBound): Option[Int] = (x,y) match {
-
-      case (Unbounded, Unbounded) => Some(0)
-
-      case (Atmost(left), Atmost(right)) => Some(scala.Ordering[Int].compare(left, right))
-      case (Atleast(left), Atleast(right)) => Some(scala.Ordering[Int].compare(left, right))
-
-      case (Interval(lowLeft, highLeft), Interval(lowRight, highRight)) =>
-        Some(scala.Ordering[Int].compare(lowLeft, lowRight) |+| scala.Ordering[Int].compare(highLeft, highRight))
-
-      case (_, Unbounded) => Some(1)
-      case (Unbounded, _) => Some(-1)
-
-      case _ => None
-    }
-
-    override def lteq(x: LengthBound, y: LengthBound): Boolean = tryCompare(x, y).exists(x => x == -1 || x == 0)
-  }
 }
 
-case class Bound(value: BigDecimal, inclusive: Boolean) {
-  def <=(other: Bound): Boolean = value <= other.value
-  def >=(other: Bound): Boolean = value >= other.value
-}
+case class Bound(value: BigDecimal, inclusive: Boolean)
 
-case class Range(lower: Bound, upper: Bound) {
-  def isCompatible(other: Range): Boolean =
-    other.lower <= lower && other.upper >= upper
-}
+case class Range(lower: Bound, upper: Bound)
 
 sealed abstract class IntegerType(val format: String)
 

@@ -17,7 +17,6 @@ trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Par
   val cnil: F[CNil]
 
   val uuid: F[UUID]
-  val instant: F[Instant]
 
   def option[A](from: F[A]): F[Option[A]]
   def list[A](of: F[A]): F[List[A]]
