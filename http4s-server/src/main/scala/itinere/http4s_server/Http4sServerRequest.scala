@@ -23,11 +23,13 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
   override def requestHeader[A](name: String, headerValue: Primitives[HttpRequestHeaderValue] => HttpRequestHeaderValue[A], description: Option[String]): HttpRequestHeaders[A] =
     Kleisli { headers =>
       for {
-        rawValue <- OptionT.fromOption[F](headers.get(CaseInsensitiveString(name)))
-        result <- headerValue(HttpRequestHeaderValues).fromString(rawValue.value) match {
+        rawValue <- headers.get(CaseInsensitiveString(name)) match {
+          case Some(value) => OptionT.pure[F](value.value)
+          case None => OptionT.liftF[F, String](F.raiseError(HeaderDecodeFailure(s"Required header '$name' not present.", None)))
+        }
+        result <- headerValue(HttpRequestHeaderValues).fromString(rawValue) match {
           case Attempt.Success(value)   => OptionT.pure[F](value)
-          case Attempt.Exception(error) => OptionT.liftF[F, A](F.raiseError(HeaderDecodeFailure(s"Failed to decode header '$name'", Some(error))))
-          case Attempt.Error(error)     => OptionT.liftF[F, A](F.raiseError(HeaderDecodeFailure(s"Failed to decode header '$name': $error", None)))
+          case Attempt.Error(error, cause)     => OptionT.liftF[F, A](F.raiseError(HeaderDecodeFailure(s"Failed to decode header '$name'", cause)))
         }
       } yield result
     }
@@ -49,7 +51,7 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
         b <- headers.run(req.headers)
         c <- OptionT.liftF(req.as[C](F, entity))
         uri = urlDecode.matchedSegments.mkString("/")
-      } yield RequestMessage(req.method, uri, TO.apply(T.apply(a, b), c))
+      } yield RequestMessage(req.method.name, uri, TO.apply(T.apply(a, b), c))
     } else {
       OptionT.none
     }
@@ -60,10 +62,8 @@ trait Http4sServerRequest extends HttpRequestAlgebra with Http4sServerUrl { self
     override def imap[A, B](fa: HttpRequestHeaders[A])(f: A => B)(g: B => A): HttpRequestHeaders[B] = fa.map(f)
   }
   override implicit val httpRequestEntityInvariantFunctor: Invariant[HttpRequestEntity] = new Invariant[HttpRequestEntity] {
-    override def imap[A, B](fa: HttpRequestEntity[A])(f: A => B)(g: B => A): HttpRequestEntity[B] = new HttpRequestEntity[B] {
-      override def decode(msg: Message[F], strict: Boolean): DecodeResult[F, B] = fa.decode(msg, strict).map(f)
-      override def consumes: Set[MediaRange] = fa.consumes
-    }
+    override def imap[A, B](fa: HttpRequestEntity[A])(f: A => B)(g: B => A): HttpRequestEntity[B] =
+      fa.map(f)
   }
   override implicit val httpRequestInvariantFunctor: Invariant[HttpRequest] = new Invariant[HttpRequest] {
     override def imap[A, B](fa: HttpRequest[A])(f: A => B)(g: B => A): HttpRequest[B] =

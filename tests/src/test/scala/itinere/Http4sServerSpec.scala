@@ -1,16 +1,16 @@
 package itinere
 
-import cats.implicits._
 import cats.Show
 import cats.effect.{IO, Sync}
+import cats.implicits._
 import eu.timepit.refined._
-import eu.timepit.refined.api.{RefType, Refined, Validate}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.types.numeric.{PosInt, PosLong}
 import io.circe.Error
 import io.circe.literal._
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{HeaderDecodeFailure, Http4sServer, Http4sServerJson, UriDecodeFailure}
+import itinere.http4s_server.{Http4sServer, Http4sServerJson}
 import itinere.refined._
 import org.http4s._
 import org.http4s.circe._
@@ -55,26 +55,24 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
     "get" >> {
       "return http 200 ok" >> {
-        val resp = serve(
-          get(Uri.uri("/users/1"), Header("X-Token", "23") :: Nil)
-        )
+        val resp = serve(get(Uri.uri("/users/1"), Header("X-Token", "23") ::  Header("X-ValidTill", "1234") :: Nil))
 
         resp must returnStatus(Status.Ok)
         resp.as[io.circe.Json] must returnValue(json"""{"value": {"id": 1, "name": "Klaas", "age": 3}}""")
       }
 
-      "return http 400 bad_request when segment userId is -1" >> {
-        val resp = serve(get(Uri.uri("/users/-1"), Header("X-Token", "23") :: Nil))
-
-        resp must returnStatus(Status.BadRequest)
-        resp.as[String] must returnValue("Failed to decode segment userId: Predicate failed: (-1 > 0).")
-      }
-
-      "return http 404 not_found" >> {
-        val resp = serve(get(Uri.uri("/users/2"), Header("X-Token", "23") :: Nil))
+      "return http 404 not_found when non existing id is given" >> {
+        val resp = serve(get(Uri.uri("/users/2"), Header("X-Token", "23") :: Header("X-ValidTill", "1234") :: Nil))
 
         resp must returnStatus(Status.NotFound)
         resp.as[io.circe.Json] must returnValue(json"""{"error": "User was not found"}""")
+      }
+
+      "return http 400 bad_request when segment userId is -1" >> {
+        val resp = serve(get(Uri.uri("/users/-1"), Header("X-Token", "23") :: Header("X-ValidTill", "1234") :: Nil))
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Failed to decode segment userId: Predicate failed: (-1 > 0).")
       }
 
       "return http 400 bad_request when X-Token is not a int" >> {
@@ -82,6 +80,22 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
         resp must returnStatus(Status.BadRequest)
         resp.as[String] must returnValue("Failed to decode header 'X-Token': For input string: \"this-is-astring\"")
+      }
+
+      "return http 400 bad_request when no header is given" >> {
+        val resp = serve(get(Uri.uri("/users/2")))
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Required header 'X-Token' not present.")
+      }
+    }
+
+    "delete" >> {
+      "return http 200 ok" >> {
+        val resp = serve(delete(Uri.uri("/users/1")))
+
+        resp must returnStatus(Status.Ok)
+        resp.as[String] must returnValue("")
       }
     }
   }
@@ -99,11 +113,17 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
   private def get[A](uri: Uri, headers: List[Header] = Nil): IO[Request[IO]] =
     IO.pure(Request(Method.GET, uri, headers = Headers(headers)))
+
+  private def delete[A](uri: Uri, headers: List[Header] = Nil): IO[Request[IO]] =
+    IO.pure(Request(Method.DELETE, uri, headers = Headers(headers)))
 }
 
 
 
 trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPrimitives {
+
+  val userId: Path[Refined[Long, Positive]] = segment("userId", _.long.refined[Positive])
+  val authInfo: HttpRequestHeaders[AuthInfo] = (requestHeader("X-Token", _.int.refined[Positive]) ~ requestHeader("X-ValidTill", _.long.refined[Positive])).as[AuthInfo]
 
   def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
     coproductResponseBuilder
@@ -120,13 +140,21 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
     GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
       response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
+
+
   val userGet =
-    GET(path / "users" / segment("userId", _.long.refined[Positive]), requestHeader("X-Token", _.int.refined[Positive])) ~>
+    GET(path / "users" / userId, authInfo) ~>
       domainResponse(User.json)
 
-
+  val userDelete =
+    DELETE(path / "users" / userId) ~> response(HttpStatus.Ok)
 
 }
+
+final case class AuthInfo(
+  token: PosInt,
+  validTill: PosLong
+)
 
 final case class ListFilter(
   ageGreater: Option[PosInt],
@@ -174,22 +202,17 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   override def F: Sync[IO] = Sync[IO]
 
   override def errorHandler(error: Throwable): Response[IO] = error match {
-    case u : UriDecodeFailure =>
-      Response(Status.BadRequest).withEntity(u.message)
-    case u : HeaderDecodeFailure =>
-      Response(Status.BadRequest).withEntity(u.message)
     case MalformedMessageBodyFailure(_, Some(err: Error)) =>
       Response(Status.BadRequest).withEntity(Show[Error].show(err))
-    case InvalidMessageBodyFailure(_, Some(err: Error)) =>
-      Response(Status.BadRequest).withEntity(Show[Error].show(err))
-    case _ =>
-      Response(Status.InternalServerError).withEntity("Internal server error")
+    case err =>
+      super.errorHandler(err)
   }
 
 
   val handlers =
     userRegister.implementedBy(r => IO.pure(r.name)) <+>
     userList.implementedBy(_ => IO.pure(List.empty)) <+>
+    userDelete.implementedBy(_ => IO.pure(HNil)) <+>
     userGet.implementedBy { case userId :: token :: _ => IO.pure(if(userId.value == 1l) DomainResponse.Success(User(userId, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }

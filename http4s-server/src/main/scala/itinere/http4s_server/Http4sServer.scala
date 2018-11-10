@@ -22,8 +22,6 @@ abstract class Http4sServer
 
   implicit def F: Sync[F]
 
-  final case class RequestMessage[A](method: HttpMethod, uri: String, value: A)
-
   final case class HttpEndpoint[A, B](request: HttpRequest[A], response: HttpResponse[B]) {
     def implementedBy(implementation: A => F[B]): HttpRoutes[F] =
       Kleisli(req => request(req).flatMap(a => OptionT.liftF(measureLatency(a, implementation))).map(response.apply))
@@ -45,7 +43,12 @@ abstract class Http4sServer
   def measurementHandler(message: RequestMessage[FiniteDuration]): F[Unit] = F.unit
 
   def errorHandler(error: Throwable): Resp[F] = error match {
-    case MalformedMessageBodyFailure(err, _) => Resp(Status.BadRequest).withEntity(err)
+    case u : UriDecodeFailure =>
+      Resp(Status.BadRequest).withEntity(u.message)
+    case u : HeaderDecodeFailure =>
+      Resp(Status.BadRequest).withEntity(u.message)
+    case MalformedMessageBodyFailure(err, _) =>
+      Resp(Status.BadRequest).withEntity(err)
     case err =>
       Resp(Status.InternalServerError).withEntity("Internal server error")
   }

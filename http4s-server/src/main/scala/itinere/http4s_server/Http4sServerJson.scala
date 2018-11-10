@@ -16,10 +16,8 @@ trait Http4sServerJson extends HttpJsonAlgebra { self: Http4sServer with JsonLik
       F.map(msg.body.through(text.utf8Decode).compile.foldMonoid)(t => jsonDecoder(json).decode(t) match {
         case Attempt.Success(value)   =>
           Right(value)
-        case Attempt.Exception(err)   =>
-          Left(MalformedMessageBodyFailure("Error while decoding json", Some(err)))
-        case Attempt.Error(err)       =>
-          Left(MalformedMessageBodyFailure(err, None))
+        case Attempt.Error(err, cause) =>
+          Left(MalformedMessageBodyFailure(err, cause))
       })
     }
 

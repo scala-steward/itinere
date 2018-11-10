@@ -58,6 +58,8 @@ val tests = project
   .settings(commonSettings("tests"))
   .settings(
     libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-laws" % catsVersion % Test,
+      "org.typelevel" %% "discipline" % "0.10.0" % Test,
       "com.propensive" %% "magnolia" % "0.10.0" % Test,
       "org.http4s" %% "http4s-circe" % "0.20.0-M2" % Test,
       "io.circe" %% "circe-literal" % "0.10.0" % Test,

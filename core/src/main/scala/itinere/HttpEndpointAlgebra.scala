@@ -22,10 +22,10 @@ trait UrlAlgebra {
   type Url[A]
 
   type QueryStringValue[A]
-  type Segment[A]
+  type SegmentValue[A]
 
-  protected def QueryStringValue: Primitives[QueryStringValue]
-  protected def Segment: Primitives[Segment]
+  protected def QueryStringValues: Primitives[QueryStringValue]
+  protected def SegmentValues: Primitives[SegmentValue]
 
   implicit class QueryStringOps[A](first: QueryString[A]) {
     final def & [B](second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
@@ -42,7 +42,7 @@ trait UrlAlgebra {
   }
 
   def staticPathSegment(segment: String): Path[HNil]
-  def segment[A](name: String, segment: Primitives[Segment] => Segment[A], description: Option[String] = None): Path[A]
+  def segment[A](name: String, segment: Primitives[SegmentValue] => SegmentValue[A], description: Option[String] = None): Path[A]
   def chainPaths[A, B](first: Path[A], second: Path[B])(implicit tupler: Tupler[A, B]): Path[tupler.Out]
   val path: Path[HNil] = staticPathSegment("")
   def urlWithQueryString[A, B](path: Path[A], qs: QueryString[B])(implicit tupler: Tupler[A, B]): Url[tupler.Out]
@@ -53,8 +53,8 @@ trait UrlAlgebra {
 
   implicit val queryStringValueInvariant: Invariant[QueryStringValue]
   implicit val queryStringValuePartial: Partial[QueryStringValue]
-  implicit val segmentInvariant: Invariant[Segment]
-  implicit val segmentPartial: Partial[Segment]
+  implicit val segmentInvariant: Invariant[SegmentValue]
+  implicit val segmentPartial: Partial[SegmentValue]
 }
 
 trait HttpResponseAlgebra {
@@ -127,8 +127,11 @@ trait HttpRequestAlgebra extends UrlAlgebra {
 
   def POST[A, B, C, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)
                       (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] =
-    request[A, B, C, AB](HttpMethod.POST, url, headers, entity)
+    request(HttpMethod.POST, url, headers, entity)
 
+  def DELETE[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)
+                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
+    request(HttpMethod.DELETE, url, headers, emptyRequestEntity)
 
   implicit val httpRequestHeadersInvariantFunctor: Invariant[HttpRequestHeaders]
   implicit val httpRequestEntityInvariantFunctor: Invariant[HttpRequestEntity]
