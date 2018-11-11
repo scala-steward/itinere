@@ -101,7 +101,6 @@ lazy val noPublishSettings = Seq(
 
 def commonSettings(n: String) = Seq(
   name := s"itinere-$n",
-  version := dynver.value,
   organization := "net.vectos",
   scalaVersion := "2.12.7",
   scalafmtOnCompile := true,
