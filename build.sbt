@@ -165,6 +165,7 @@ def publishSettings = Seq(
   publishArtifact in Test := false,
   sources in (Compile, doc) := Seq(),
   publishArtifact in (Compile, packageDoc) := false,
+  publishArtifact in packageDoc := false,
   publishArtifact in (Compile, packageSrc) := false,
   licenses += ("MIT", url("http://opensource.org/licenses/MIT")),
   releaseEarlyEnableSyncToMaven := false,
