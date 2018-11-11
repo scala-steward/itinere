@@ -45,7 +45,7 @@ trait Tupler1 extends Tupler0 {
 }
 
 trait Tupler2 extends Tupler1 {
-  implicit def leftRight[A <: HList, B <: HList](implicit prepend : Prepend[A, B]): Aux[A, B, prepend.Out] =
+  implicit def leftRight[A <: HList, B <: HList](implicit prepend: Prepend[A, B]): Aux[A, B, prepend.Out] =
     new Tupler[A, B] {
       type Out = prepend.Out
       def apply(a: A, b: B) = prepend.apply(a, b)
@@ -67,7 +67,7 @@ trait Tupler4 extends Tupler3 {
 
   implicit def rightUnit[A]: Aux[A, HNil, A] = new Tupler[A, HNil] {
     type Out = A
-    def apply(a: A, b: HNil): A  = a
+    def apply(a: A, b: HNil): A = a
 
     override def unapply(out: A): (A, HNil) = out -> HNil
   }

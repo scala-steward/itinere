@@ -17,7 +17,7 @@ class CirceSpec extends Specification with ScalaCheck with ArbDerivation with Ci
   }
 
   /** Parameters to configure scalacheck generators */
-  override implicit def parameters: Gen.Parameters = Gen.Parameters.default
+  implicit override def parameters: Gen.Parameters = Gen.Parameters.default
 
   implicit val arbColor: Arbitrary[Color] = Arbitrary(Gen.oneOf(Color.all.toSeq))
 }
@@ -31,8 +31,8 @@ object BookingProcess {
   val json: Json[BookingProcess] = {
 
     val inProgress = Json.object1("InProgress")(InProgress.apply)("name" -> member(Json.string, _.name))
-    val done = Json.object1("Done")(Done.apply)("name" -> member(Json.long, _.at))
-    val cancelled = Json.object2("Cancelled")(Cancelled.apply)("reason" -> member(Json.string, _.reason), "at" -> member(Json.long, _.at))
+    val done = Json.object1("Done")(Done.apply)("name"                   -> member(Json.long, _.at))
+    val cancelled = Json.object2("Cancelled")(Cancelled.apply)("reason"  -> member(Json.string, _.reason), "at" -> member(Json.long, _.at))
 
     (inProgress | done | cancelled).as[BookingProcess]
   }
@@ -78,21 +78,21 @@ final case class SupportedTypes(
 object SupportedTypes {
 
   val json: Json[SupportedTypes] = Json.object16("AllTypes")(SupportedTypes.apply)(
-    "int" -> member(Json.int, _.int),
-    "long" -> member(Json.long, _.long),
-    "double" -> member(Json.double, _.double),
-    "float" -> member(Json.float, _.float),
-    "string" -> member(Json.string, _.string),
-    "boolean" -> member(Json.bool, _.boolean),
-    "uuid" -> member(Json.uuid, _.uuid),
-    "option" -> member(Json.option(Json.int), _.option),
-    "list" -> member(Json.list(Json.int), _.list),
-    "vector" -> member(Json.vector(Json.int), _.vector),
-    "set" -> member(Json.set(Json.int), _.set),
-    "seq" -> member(Json.seq(Json.int), _.seq),
-    "either" -> member(Json.or(Json.int, Json.string), _.either),
-    "color" -> member(Color.json, _.color),
-    "userId" -> member(UserId.json, _.userId),
+    "int"            -> member(Json.int, _.int),
+    "long"           -> member(Json.long, _.long),
+    "double"         -> member(Json.double, _.double),
+    "float"          -> member(Json.float, _.float),
+    "string"         -> member(Json.string, _.string),
+    "boolean"        -> member(Json.bool, _.boolean),
+    "uuid"           -> member(Json.uuid, _.uuid),
+    "option"         -> member(Json.option(Json.int), _.option),
+    "list"           -> member(Json.list(Json.int), _.list),
+    "vector"         -> member(Json.vector(Json.int), _.vector),
+    "set"            -> member(Json.set(Json.int), _.set),
+    "seq"            -> member(Json.seq(Json.int), _.seq),
+    "either"         -> member(Json.or(Json.int, Json.string), _.either),
+    "color"          -> member(Color.json, _.color),
+    "userId"         -> member(UserId.json, _.userId),
     "bookingProcess" -> member(BookingProcess.json, _.bookingProcess)
   )
 }

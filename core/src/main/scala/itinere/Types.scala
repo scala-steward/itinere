@@ -1,8 +1,6 @@
 package itinere
 
-import cats.implicits._
 import cats.~>
-
 
 trait CoCartesian[F[_]] {
   def sum[A, B](fa: F[A], fb: F[B]): F[Either[A, B]]
@@ -20,12 +18,11 @@ trait ToJson[A] {
   def encode(value: A): String
 }
 
-
 final case class Member[F[_], A, B] private (
-                                              fa: F[A],
-                                              getter: B => A,
-                                              documentation: Option[String]
-                                            ) {
+  fa: F[A],
+  getter: B => A,
+  documentation: Option[String]
+) {
   def transform[G[_]](f: F ~> G): Member[G, A, B] = copy(fa = f(fa))
 }
 
@@ -45,60 +42,33 @@ case class Range(lower: Bound, upper: Bound)
 sealed abstract class IntegerType(val format: String)
 
 object IntegerType {
-
   case object Int32 extends IntegerType("int32")
-
   case object Int64 extends IntegerType("int64")
-
-  val all = Set(Int32, Int64)
-
-  def fromString(value: String): Option[IntegerType] = all.find(_.format == value)
-
 }
 
 sealed abstract class NumberType(val format: String)
 
 object NumberType {
-
   case object Float extends NumberType("float")
   case object Double extends NumberType("double")
-
-  val all = Set(Float, Double)
-
-  def fromString(value: String): Option[NumberType] = all.find(_.format == value)
 }
 
 sealed abstract class StringType(val format: String)
 
 object StringType {
-
   case object DateTime extends StringType("date-time")
-
   case object Email extends StringType("email")
-
   case object Hostname extends StringType("hostname")
-
   case object IPV4 extends StringType("ipv4")
-
   case object IPV6 extends StringType("ipv6")
-
   case object Uri extends StringType("uri")
-
-  val all = Set(DateTime, Email, Hostname, IPV4, IPV6, Uri)
-
-  def fromString(value: String): Option[StringType] = all.find(_.format == value)
 }
 
-sealed trait StringDescription
+sealed trait StringDescriptor
 
-object StringDescription {
-
-  case class Type(stringType: StringType) extends StringDescription
-
-  case class Length(lengthBound: LengthBound) extends StringDescription
-
-  case class Pattern(pattern: String) extends StringDescription
-
-  case object Unbounded extends StringDescription
-
+object StringDescriptor {
+  case class Type(stringType: StringType) extends StringDescriptor
+  case class Length(lengthBound: LengthBound) extends StringDescriptor
+  case class Pattern(pattern: String) extends StringDescriptor
+  case object Unbounded extends StringDescriptor
 }

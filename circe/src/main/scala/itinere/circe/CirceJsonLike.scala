@@ -1,15 +1,11 @@
 package itinere.circe
 
-
-import java.time.Instant
 import java.util.UUID
 
 import cats.implicits._
 import io.circe.{Decoder, Encoder}
 import itinere._
 import shapeless.CNil
-
-import scala.util.Try
 
 trait CirceJsonLike extends JsonLike {
   private implicit val decoder: JsonAlgebra[Decoder] = new JsonAlgebra[Decoder] with CirceDecoderObjectN {
@@ -22,7 +18,7 @@ trait CirceJsonLike extends JsonLike {
 
     override def long(bound: Range): Decoder[Long] = Decoder.decodeLong
 
-    override def string(description: StringDescription): Decoder[String] = Decoder.decodeString
+    override def string(description: StringDescriptor): Decoder[String] = Decoder.decodeString
 
     override val bool: Decoder[Boolean] = Decoder.decodeBoolean
 
@@ -56,7 +52,7 @@ trait CirceJsonLike extends JsonLike {
 
     override def long(bound: Range): Encoder[Long] = Encoder.encodeLong
 
-    override def string(description: StringDescription): Encoder[String] = Encoder.encodeString
+    override def string(description: StringDescriptor): Encoder[String] = Encoder.encodeString
 
     override val bool: Encoder[Boolean] = Encoder.encodeBoolean
 
@@ -84,7 +80,7 @@ trait CirceJsonLike extends JsonLike {
       fb: Encoder[B]
     ): Encoder[Either[A, B]] = new Encoder[Either[A, B]] {
       override def apply(a: Either[A, B]): io.circe.Json = a match {
-        case Left(left) => fa(left)
+        case Left(left)   => fa(left)
         case Right(right) => fb(right)
       }
     }
@@ -94,7 +90,7 @@ trait CirceJsonLike extends JsonLike {
     override def decode(input: String): Attempt[A] =
       for {
         jsonValue <- Attempt.fromThrowable(io.circe.parser.parse(input))
-        value <- Attempt.fromThrowable(json.apply[Decoder].decodeJson(jsonValue))
+        value     <- Attempt.fromThrowable(json.apply[Decoder].decodeJson(jsonValue))
       } yield value
   }
 

@@ -28,7 +28,7 @@ trait UrlAlgebra {
   protected def SegmentValues: Primitives[SegmentValue]
 
   implicit class QueryStringOps[A](first: QueryString[A]) {
-    final def & [B](second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
+    final def &[B](second: QueryString[B])(implicit tupler: Tupler[A, B]): QueryString[tupler.Out] =
       combineQueryStrings(first, second)
   }
 
@@ -36,9 +36,9 @@ trait UrlAlgebra {
   def qs[A](name: String, queryStringValue: Primitives[QueryStringValue] => QueryStringValue[A], description: Option[String] = None): QueryString[Option[A]]
 
   implicit class PathOps[A](first: Path[A]) {
-    final def / (second: String)(implicit tupler: Tupler[A, HNil]): Path[tupler.Out] = chainPaths(first, staticPathSegment(second))
-    final def / [B](second: Path[B])(implicit tupler: Tupler[A, B]): Path[tupler.Out] = chainPaths(first, second)
-    final def /? [B](qs: QueryString[B])(implicit tupler: Tupler[A, B]): Url[tupler.Out] = urlWithQueryString(first, qs)
+    final def /(second: String)(implicit tupler: Tupler[A, HNil]): Path[tupler.Out] = chainPaths(first, staticPathSegment(second))
+    final def /[B](second: Path[B])(implicit tupler: Tupler[A, B]): Path[tupler.Out] = chainPaths(first, second)
+    final def /?[B](qs: QueryString[B])(implicit tupler: Tupler[A, B]): Url[tupler.Out] = urlWithQueryString(first, qs)
   }
 
   def staticPathSegment(segment: String): Path[HNil]
@@ -67,13 +67,15 @@ trait HttpResponseAlgebra {
 
   final class CoproductHttpResponseBuilder[B <: Coproduct](coproduct: HttpResponse[B]) {
     def add[A](resp: HttpResponse[A]): CoproductHttpResponseBuilder[A :+: B] = {
-      val newCoproduct = httpResponseCocartesian.sum(resp, coproduct).imap {
-        case Left(l) => Inl(l)
-        case Right(r) => Inr(r)
-      } {
-        case Inl(l) => Left(l)
-        case Inr(r) => Right(r)
-      }
+      val newCoproduct = httpResponseCocartesian
+        .sum(resp, coproduct)
+        .imap {
+          case Left(l)  => Inl(l)
+          case Right(r) => Inr(r)
+        } {
+          case Inl(l) => Left(l)
+          case Inr(r) => Right(r)
+        }
 
       new CoproductHttpResponseBuilder(newCoproduct)
     }
@@ -118,19 +120,15 @@ trait HttpRequestAlgebra extends UrlAlgebra {
   def emptyRequestHeaders: HttpRequestHeaders[HNil]
   def emptyRequestEntity: HttpRequestEntity[HNil]
 
-  def request[A, B, C, AB](method: HttpMethod, url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)
-                          (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out]
+  def request[A, B, C, AB](method: HttpMethod, url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out]
 
-  def GET[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)
-                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
+  def GET[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
     request(HttpMethod.GET, url, headers, emptyRequestEntity)
 
-  def POST[A, B, C, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)
-                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] =
+  def POST[A, B, C, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] =
     request(HttpMethod.POST, url, headers, entity)
 
-  def DELETE[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)
-                      (implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
+  def DELETE[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
     request(HttpMethod.DELETE, url, headers, emptyRequestEntity)
 
   implicit val httpRequestHeadersInvariantFunctor: Invariant[HttpRequestHeaders]
@@ -150,5 +148,3 @@ trait HttpJsonAlgebra { self: HttpRequestAlgebra with HttpResponseAlgebra =>
   def jsonResponse[A](json: Json[A], description: Option[String] = None): HttpResponseEntity[A]
   def jsonRequest[A](json: Json[A], description: Option[String] = None): HttpRequestEntity[A]
 }
-
-

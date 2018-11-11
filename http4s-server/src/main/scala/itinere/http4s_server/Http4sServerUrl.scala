@@ -1,14 +1,10 @@
 package itinere.http4s_server
 
-
-import cats.data.{NonEmptyList, OptionT}
-import cats.effect.Sync
+import cats.Invariant
 import cats.implicits._
-import cats.{Invariant, Monad}
 import itinere.{Attempt, Partial, Primitives, Read, ReadPrimitives, Tupler, UrlAlgebra}
 import org.http4s._
 import shapeless.HNil
-
 
 trait Http4sServerUrl extends UrlAlgebra {
 
@@ -27,11 +23,12 @@ trait Http4sServerUrl extends UrlAlgebra {
   override def qs[A](name: String, f: Primitives[Read] => QueryStringValue[A], description: Option[String]): QueryString[Option[A]] = new QueryString[Option[A]] {
     override def decode(uri: Uri): UriDecodeResult[Option[A]] =
       uri.query.params.get(name) match {
-        case None    => UriDecodeResult.Matched(None, uri, List.empty)
-        case Some(v) => f(QueryStringValues).fromString(v) match {
-          case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri, List.empty)
-          case Attempt.Error(err, cause)      => UriDecodeResult.Fatal(s"Failed to decode query string $name", cause)
-        }
+        case None => UriDecodeResult.Matched(None, uri, List.empty)
+        case Some(v) =>
+          f(QueryStringValues).fromString(v) match {
+            case Attempt.Success(vv)     => UriDecodeResult.Matched(Some(vv), uri, List.empty)
+            case Attempt.Error(_, cause) => UriDecodeResult.Fatal(s"Failed to decode query string $name", cause)
+          }
       }
   }
 
@@ -39,9 +36,10 @@ trait Http4sServerUrl extends UrlAlgebra {
     override def decode(uri: Uri): UriDecodeResult[HNil] = {
       val path = uri.path.split('/')
 
-      path.headOption.fold[UriDecodeResult[HNil]](UriDecodeResult.NoMatch)(s =>
-        if(segment == s) UriDecodeResult.Matched(HNil, uri.copy(path = path.tail.mkString("/")), if(segment.isEmpty) Nil else segment :: Nil)
-        else UriDecodeResult.NoMatch
+      path.headOption.fold[UriDecodeResult[HNil]](UriDecodeResult.NoMatch)(
+        s =>
+          if (segment == s) UriDecodeResult.Matched(HNil, uri.copy(path = path.tail.mkString("/")), if (segment.isEmpty) Nil else segment :: Nil)
+          else UriDecodeResult.NoMatch
       )
     }
 
@@ -54,7 +52,7 @@ trait Http4sServerUrl extends UrlAlgebra {
       path.headOption.fold[UriDecodeResult[A]](UriDecodeResult.NoMatch) { s =>
         segment(SegmentValues).fromString(s) match {
           case Attempt.Success(vv)     => UriDecodeResult.Matched(vv, uri.copy(path = path.tail.mkString("/")), s":$name" :: Nil)
-          case Attempt.Error(err, cause)      => UriDecodeResult.Fatal(s"Failed to decode segment $name", cause)
+          case Attempt.Error(_, cause) => UriDecodeResult.Fatal(s"Failed to decode segment $name", cause)
         }
       }
     }
@@ -66,23 +64,23 @@ trait Http4sServerUrl extends UrlAlgebra {
   override def urlWithQueryString[A, B](path: Path[A], qs: QueryString[B])(implicit tupler: Tupler[A, B]): Url[tupler.Out] =
     path.flatMap(a => qs.map(b => tupler(a, b)))
 
-  override implicit val queryStringInvariantFunctor: Invariant[QueryString] = new Invariant[QueryString] {
-    override def imap[A, B](fa: QueryString[A])(f: (A) => B)(g: (B) => A): QueryString[B] = new QueryString[B] {
+  implicit override val queryStringInvariantFunctor: Invariant[QueryString] = new Invariant[QueryString] {
+    override def imap[A, B](fa: QueryString[A])(f: A => B)(g: B => A): QueryString[B] = new QueryString[B] {
       override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri).map(f)
     }
   }
-  override implicit val pathInvariantFunctor: Invariant[Path] = new Invariant[Path] {
-    override def imap[A, B](fa: Path[A])(f: (A) => B)(g: (B) => A): Path[B] = new Path[B] {
+  implicit override val pathInvariantFunctor: Invariant[Path] = new Invariant[Path] {
+    override def imap[A, B](fa: Path[A])(f: A => B)(g: B => A): Path[B] = new Path[B] {
       override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri).map(f)
     }
   }
-  override implicit val urlInvariantFunctor: Invariant[Url] = new Invariant[Url] {
-    override def imap[A, B](fa: Url[A])(f: (A) => B)(g: (B) => A): Url[B] = new Url[B] {
+  implicit override val urlInvariantFunctor: Invariant[Url] = new Invariant[Url] {
+    override def imap[A, B](fa: Url[A])(f: A => B)(g: B => A): Url[B] = new Url[B] {
       override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri).map(f)
     }
   }
-  override implicit val queryStringValueInvariant: Invariant[Read] = Read.readInvariant
-  override implicit val queryStringValuePartial: Partial[Read] = Read.readPartial
-  override implicit val segmentInvariant: Invariant[Read] = Read.readInvariant
-  override implicit val segmentPartial: Partial[Read] = Read.readPartial
+  implicit override val queryStringValueInvariant: Invariant[Read] = Read.readInvariant
+  implicit override val queryStringValuePartial: Partial[Read] = Read.readPartial
+  implicit override val segmentInvariant: Invariant[Read] = Read.readInvariant
+  implicit override val segmentPartial: Partial[Read] = Read.readPartial
 }

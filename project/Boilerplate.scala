@@ -1,6 +1,5 @@
 import sbt._
 
-
 object Boilerplate {
 
   import scala.StringContext._
@@ -15,7 +14,6 @@ object Boilerplate {
       trimmedLines mkString "\n"
     }
   }
-
 
   val coreTemplates: Seq[Template] = Seq(
     GenJasonAlgebra,
@@ -72,7 +70,9 @@ object Boilerplate {
           expandInstances(next, acc ++ pre ++ instances)
         }
 
-      val rawContents = range map { n => content(new TemplateVals(n)) split '\n' filterNot (_.isEmpty) }
+      val rawContents = range map { n =>
+        content(new TemplateVals(n)) split '\n' filterNot (_.isEmpty)
+      }
       val headerLines = header split '\n'
       val instances = expandInstances(rawContents)
       val footerLines = rawContents.head.reverse.takeWhile(_ startsWith "|").map(_.tail).reverse
@@ -81,12 +81,14 @@ object Boilerplate {
   }
 
   object GenJasonAlgebra extends Template {
-    def filename(root: File) = root /  "itinere" / "JsonAlgebraObjectN.scala"
+    def filename(root: File) = root / "itinere" / "JsonAlgebraObjectN.scala"
 
     def content(tv: TemplateVals) = {
       import tv._
 
-      val params = synTypes map { tpe => s"param$tpe: (String, Member[F, $tpe, Z])"} mkString ", "
+      val params = synTypes map { tpe =>
+        s"param$tpe: (String, Member[F, $tpe, Z])"
+      } mkString ", "
 
       block"""
              |package itinere
@@ -99,13 +101,17 @@ object Boilerplate {
   }
 
   object GenJasonDsl extends Template {
-    def filename(root: File) = root /  "itinere" / "JsonDslObjectN.scala"
+    def filename(root: File) = root / "itinere" / "JsonDslObjectN.scala"
 
     def content(tv: TemplateVals) = {
       import tv._
 
-      val params = synTypes map { tpe => s"param$tpe: (String, Member[Json, $tpe, Z])"} mkString ", "
-      val applies = synTypes map { tpe => s"param$tpe._1 -> param$tpe._2.transform(naturalTransformation)"} mkString ", "
+      val params = synTypes map { tpe =>
+        s"param$tpe: (String, Member[Json, $tpe, Z])"
+      } mkString ", "
+      val applies = synTypes map { tpe =>
+        s"param$tpe._1 -> param$tpe._2.transform(naturalTransformation)"
+      } mkString ", "
 
       block"""
              |package itinere
@@ -151,20 +157,26 @@ object Boilerplate {
 //  }
 //
   object GenCirceEncoder extends Template {
-    def filename(root: File) = root /  "itinere" / "circe" / "CirceEncoderObjectN.scala"
+    def filename(root: File) = root / "itinere" / "circe" / "CirceEncoderObjectN.scala"
 
     def content(tv: TemplateVals) = {
       import tv._
 
-      val params = synTypes map { tpe => s"param$tpe: (String, Member[Encoder, $tpe, Z])"} mkString ", "
-      val applies = synTypes map { tpe => s"param$tpe._1 -> param$tpe._2.fa(param$tpe._2.getter(v))"} mkString ", "
+      val params = synTypes map { tpe =>
+        s"param$tpe: (String, Member[Encoder, $tpe, Z])"
+      } mkString ", "
+      val applies = synTypes map { tpe =>
+        s"param$tpe._1 -> param$tpe._2.fa(param$tpe._2.getter(v))"
+      } mkString ", "
 
       block"""
              |package itinere.circe
              |
+             |import com.github.ghik.silencer.silent
              |import io.circe.{Encoder, Json}
              |import itinere._
              |
+             |@silent
              |trait CirceEncoderObjectN { self: JsonAlgebra[Encoder] =>
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Encoder[Z] = new Encoder[Z] { def apply(v: Z): Json = { Json.obj($applies) } }
              |}
@@ -174,21 +186,29 @@ object Boilerplate {
   }
 
   object GenCirceDecoder extends Template {
-    def filename(root: File) = root /  "itinere" / "circe" / "CirceDecoderObjectN.scala"
+    def filename(root: File) = root / "itinere" / "circe" / "CirceDecoderObjectN.scala"
 
     def content(tv: TemplateVals) = {
       import tv._
 
-      val params = synTypes map { tpe => s"param$tpe: (String, Member[Decoder, $tpe, Z])"} mkString ", "
-      val applies = synTypes map { tpe => s"param$tpe._1" } mkString ", "
-      val implicits = synTypes map { tpe => s"param$tpe._2.fa" } mkString ", "
+      val params = synTypes map { tpe =>
+        s"param$tpe: (String, Member[Decoder, $tpe, Z])"
+      } mkString ", "
+      val applies = synTypes map { tpe =>
+        s"param$tpe._1"
+      } mkString ", "
+      val implicits = synTypes map { tpe =>
+        s"param$tpe._2.fa"
+      } mkString ", "
 
       block"""
              |package itinere.circe
              |
+             |import com.github.ghik.silencer.silent
              |import io.circe.Decoder
              |import itinere._
              |
+             |@silent
              |trait CirceDecoderObjectN { self: JsonAlgebra[Decoder] =>
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Decoder[Z] = Decoder.forProduct$arity($applies)(f)($implicits)
              |}

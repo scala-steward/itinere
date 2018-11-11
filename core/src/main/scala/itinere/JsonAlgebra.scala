@@ -1,6 +1,5 @@
 package itinere
 
-import java.time.Instant
 import java.util.UUID
 
 import cats.Invariant
@@ -12,7 +11,7 @@ trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Par
   def double(bound: Range): F[Double]
   def long(bound: Range): F[Long]
 
-  def string(description: StringDescription): F[String]
+  def string(description: StringDescriptor): F[String]
   val bool: F[Boolean]
   val cnil: F[CNil]
 

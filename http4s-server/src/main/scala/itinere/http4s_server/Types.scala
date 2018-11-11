@@ -1,21 +1,31 @@
 package itinere.http4s_server
-import cats.{Eq, Monad}
 import cats.data.OptionT
 import cats.effect.Sync
+import cats.{Eq, Monad}
 import org.http4s.Uri
+
+final case class RequestMessage[A](method: String, uri: String, value: A)
+
+final case class UriDecodeFailure(error: String, cause: Option[Throwable]) extends Throwable(error) {
+  def message: String = cause.fold(error)(exception => s"$error : ${exception.getMessage}")
+}
+
+final case class HeaderDecodeFailure(error: String, cause: Option[Throwable]) extends Throwable(error) {
+  def message: String = cause.fold(error)(exception => s"$error : ${exception.getMessage}")
+}
 
 sealed trait UriDecodeResult[+A] { self =>
 
   def toOptionT[F[_], B >: A](implicit F: Sync[F]): OptionT[F, B] = self match {
-    case UriDecodeResult.Matched(result, uri, _)    => if(uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
-    case UriDecodeResult.Fatal(err, cause)          => OptionT.liftF[F, B](F.raiseError(UriDecodeFailure(err, cause)))
-    case UriDecodeResult.NoMatch                    => OptionT.none[F, B]
+    case UriDecodeResult.Matched(result, uri, _) => if (uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
+    case UriDecodeResult.Fatal(err, cause)       => OptionT.liftF[F, B](F.raiseError(UriDecodeFailure(err, cause)))
+    case UriDecodeResult.NoMatch                 => OptionT.none[F, B]
   }
 
   def map[B](f: A => B): UriDecodeResult[B] = self match {
-    case UriDecodeResult.NoMatch => UriDecodeResult.NoMatch
+    case UriDecodeResult.NoMatch                     => UriDecodeResult.NoMatch
     case UriDecodeResult.Matched(v, remainder, segs) => UriDecodeResult.Matched(f(v), remainder, segs)
-    case UriDecodeResult.Fatal(err, cause) => UriDecodeResult.Fatal(err, cause)
+    case UriDecodeResult.Fatal(err, cause)           => UriDecodeResult.Fatal(err, cause)
   }
 
   def prependSegments(segments: List[String]): UriDecodeResult[A] = self match {
@@ -33,8 +43,8 @@ sealed trait UriDecodeResult[+A] { self =>
 
 object UriDecodeResult {
   case class Matched[A](result: A, remainder: Uri, segments: List[String]) extends UriDecodeResult[A]
-  case object NoMatch extends UriDecodeResult[Nothing]
   case class Fatal(error: String, cause: Option[Throwable] = None) extends UriDecodeResult[Nothing]
+  case object NoMatch extends UriDecodeResult[Nothing]
 }
 
 trait UriDecoder[A] {
@@ -53,13 +63,13 @@ object UriDecoder {
     override def flatMap[A, B](fa: UriDecoder[A])(f: (A) => UriDecoder[B]): UriDecoder[B] = new UriDecoder[B] {
       override def decode(uri: Uri): UriDecodeResult[B] = fa.decode(uri) match {
         case UriDecodeResult.Matched(v, remainder, segments) => f(v).decode(remainder).prependSegments(segments)
-        case UriDecodeResult.NoMatch => UriDecodeResult.NoMatch
-        case UriDecodeResult.Fatal(err, cause) => UriDecodeResult.Fatal(err, cause)
+        case UriDecodeResult.NoMatch                         => UriDecodeResult.NoMatch
+        case UriDecodeResult.Fatal(err, cause)               => UriDecodeResult.Fatal(err, cause)
       }
     }
 
     override def tailRecM[A, B](a: A)(f: (A) => UriDecoder[Either[A, B]]): UriDecoder[B] = flatMap(f(a)) {
-      case Left(v) => tailRecM(v)(f)
+      case Left(v)  => tailRecM(v)(f)
       case Right(v) => pure(v)
     }
   }

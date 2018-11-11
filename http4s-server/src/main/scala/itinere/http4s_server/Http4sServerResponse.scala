@@ -1,6 +1,5 @@
 package itinere.http4s_server
 
-
 import cats.Invariant
 import fs2._
 import itinere.{CoCartesian, HttpResponseAlgebra, HttpStatusCodes, Tupler}
@@ -24,7 +23,7 @@ trait Http4sServerResponse extends HttpResponseAlgebra { self: Http4sServer =>
   def cnil: CNil => Resp[F] = _ => Resp[F](Status.Forbidden, body = Stream.empty)
 
   def response[A, B](statusCode: HttpStatus, headers: HttpResponseHeaders[A], entity: HttpResponseEntity[B])(implicit T: Tupler[A, B]): T.Out => Resp[F] = out => {
-    val (a,b) = T.unapply(out)
+    val (a, b) = T.unapply(out)
     val h = headers(a)
     val e = entity.toEntity(b).body
 
@@ -44,12 +43,8 @@ trait Http4sServerResponse extends HttpResponseAlgebra { self: Http4sServer =>
 
   implicit val httpResponseCocartesian: CoCartesian[Lambda[A => Function[A, Resp[F]]]] = new CoCartesian[Function[?, Resp[F]]] {
     override def sum[A, B](fa: Function[A, Resp[F]], fb: Function[B, Resp[F]]): Function[Either[A, B], Resp[F]] = {
-      case Left(a) => fa(a)
+      case Left(a)  => fa(a)
       case Right(b) => fb(b)
     }
   }
-}
-
-trait HttpHeaders[A] {
-
 }
