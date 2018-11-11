@@ -6,12 +6,10 @@ import cats.implicits._
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import eu.timepit.refined.types.numeric.{PosInt, PosLong}
 import io.circe.Error
 import io.circe.literal._
 import itinere.circe.CirceJsonLike
 import itinere.http4s_server.{Http4sServer, Http4sServerJson}
-import itinere.refined._
 import org.http4s._
 import org.http4s.circe._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
@@ -91,10 +89,17 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
     "delete" >> {
       "return http 200 ok" >> {
-        val resp = serve(delete(Uri.uri("/users/1")))
+        val resp = serve(delete(Uri.uri("/users/1/red")))
 
         resp must returnStatus(Status.Ok)
         resp.as[String] must returnValue("")
+      }
+
+      "return http 400 bad_request when invalid is given" >> {
+        val resp = serve(delete(Uri.uri("/users/1/purple")))
+
+        resp must returnStatus(Status.BadRequest)
+        resp.as[String] must returnValue("Failed to decode segment color")
       }
     }
   }
@@ -120,6 +125,10 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
 
   val userId: Path[Refined[Long, Positive]] = segment("userId", _.long.refined[Positive])
   val authInfo: HttpRequestHeaders[AuthInfo] = (requestHeader("X-Token", _.int.refined[Positive]) ~ requestHeader("X-ValidTill", _.long.refined[Positive])).as[AuthInfo]
+  val color: Path[Color] = segment(
+    "color",
+    _.string.pmap(c => Attempt.fromOption(Color.fromString(c), s"The `$c` is not part of the Color enumeration (${Color.all.mkString(" | ")})"))(_.name)
+  )
 
   def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
     coproductResponseBuilder
@@ -136,59 +145,10 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
   GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
   response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
-  val userGet =
-  GET(path / "users" / userId, authInfo) ~>
-  domainResponse(User.json)
+  val userGet = GET(path / "users" / userId, authInfo) ~> domainResponse(User.json)
 
-  val userDelete =
-  DELETE(path / "users" / userId) ~> response(HttpStatus.Ok)
+  val userDelete = DELETE(path / "users" / userId / color) ~> response(HttpStatus.Ok)
 
-}
-
-final case class AuthInfo(
-  token: PosInt,
-  validTill: PosLong
-)
-
-final case class ListFilter(
-  ageGreater: Option[PosInt],
-  nameStartsWith: Option[String]
-)
-
-final case class RegisterUser(
-  name: String,
-  age: PosInt
-)
-
-final case class User(
-  id: PosLong,
-  name: String,
-  age: PosInt
-)
-object User {
-  val json: Json[User] = Json.object3("User")(User.apply)(
-    "id"   -> member(Json.long.positive, _.id),
-    "name" -> member(Json.string, _.name),
-    "age"  -> member(Json.int.positive, _.age)
-  )
-}
-
-object RegisterUser {
-  val json: Json[RegisterUser] = Json.object2("RegisterUser")(RegisterUser.apply)(
-    "name" -> member(Json.string, _.name),
-    "age"  -> member(Json.int.positive, _.age)
-  )
-}
-
-sealed trait DomainResponse[+A]
-object DomainResponse {
-  final case class Success[A](value: A) extends DomainResponse[A]
-  final case class BadRequest(error: String) extends DomainResponse[Nothing]
-  final case class NotFound(error: String) extends DomainResponse[Nothing]
-
-  def success[A](value: Json[A]): Json[Success[A]] = Json.object1("Success")(Success[A](_))("value" -> member(value, _.value))
-  val badRequest: Json[BadRequest] = Json.object1("BadRequest")(BadRequest.apply)("error"           -> member(Json.string, _.error))
-  val notFound: Json[NotFound] = Json.object1("NotFound")(NotFound.apply)("error"                   -> member(Json.string, _.error))
 }
 
 object Server extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
