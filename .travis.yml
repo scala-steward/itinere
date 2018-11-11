@@ -26,6 +26,7 @@ env:
 
 stages:
 - name: test
+  if: NOT tag is present
 - name: release
   if: tag IS present
 
