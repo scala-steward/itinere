@@ -5,11 +5,17 @@ scala:
 - 2.12.7
 jdk:
 - oraclejdk8
+before_install:
+- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then openssl aes-256-cbc -K $encrypted_f5dd5ea7c332_key
+  -iv $encrypted_f5dd5ea7c332_iv -in travis/secrets.tar.enc -out travis/secrets.tar
+  -d; tar xv -C travis -f travis/secrets.tar; fi
 install:
 - pip install --user codecov
 script:
-- sbt coverage "tests/test" coverageReport
+- sbt validateCoverage
 - codecov
+after_success:
+- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then sbt releaseEarly; fi
 cache:
   directories:
   - "$HOME/.sbt/1.0/dependency"
@@ -21,14 +27,8 @@ before_cache:
 - du -h -d 2 $HOME/.sbt/
 - find $HOME/.sbt -name "*.lock" -type f -delete
 - find $HOME/.ivy2/cache -name "ivydata-*.properties" -type f -delete
-before_install:
-- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then openssl aes-256-cbc -K $encrypted_f5dd5ea7c332_key
-  -iv $encrypted_f5dd5ea7c332_iv -in travis/secrets.tar.enc -out travis/secrets.tar
-  -d; tar xv -C travis -f travis/secrets.tar; fi
 env:
   global:
-    secure: mU1Rax5OaQHBt1otdKZIMJZjowlhq3QdYmaMfqtD/frx40skbADNR3CKupu1G8FMMybyb+K5Zlayr6rA0QPPzpFz9PbTjSf1n61sE/TaXDpD2zHdrih3p2MPijYHnP5ssjlG5+yJei9sN4Qu2PKXRetGeJi6j6JkyUClmTgcnkAUIq52S6DAsBP4AZeyMou8WGlxu7tOcMMHCVd4vPrXGHNsDMF23A9+6xl1YpWbLUM0mQ2KI6SYjPt5r2sfvU5PW/VGxrR2zhseL8tIhs1CP9ihU4tLzre7kmI7DnXbsKxrUOu/RVVfzptnq294FxIEODNDi6o0V74bAVpJWVexJfpcm7Dsk/V7XKcegLXJywjmosgW4sfkXuLx7G9LRixCZMualXxEdd/o2klVBD8vLKU2AA/C2QPqrJUXvUMskf+r3f72MCmq1J/leucCWSE+r4otlogvVhSsXagP7lyTAzKxN0odQD3+Bp0tpWl4yKhLJ/urfy4U9k4hJ4T7lVcpc8iuDiVN+OTx1D9+s7vjkuBwIODJ3HqH6rhDsjcGYBRQ22VQbt9PAH1+8wVZYugq52CKimBT/yhRAj1K/EO1NTkw+JTtPhGQL1jKE3AAYogkIgG+bw5+ILHJu3aYQ0m37eU7cogZb7utzbY0Af4OjwCSlQ8FmruheVmdhPvFZ+w=
-after_success:
-- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then sbt releaseEarly; fi
-dd:
-  secure: Ralqvbga9O0jiHDApxzzg5Jf8vkVs9FMDZApkwxdneopDHNTv6SaJqDlWQIh2ypE8643yVBxuZlb/24BJPndZfa5MStbOyBUdo+6tO8N5+a+9YX3rbeJwPdCdtc6f9vyodyWEKCYKDB2YBfoLM78OajpQQQuXOJRsDfSVZc8Pvt1x0YfZyN87fPjUqUboYua/BpzfW0LH/MvENvRwLnRG/rrWTF/VL4oozOo3E8JG5s25JqOBLL/JJneRN9Wgk7bOI/5Pui4KEnWaVxkM1iUvcj/b1JhxtlvPyP026wOqbZbL16oArSq9hjPNMRumG+E1IA/ix4vY3+iYjEDkNJ7Sk7Yv955QhU1nIlhoLZ0D+AaUi8cfRPpuHQw3uR9AaV/hSGwfaTblmsPjYW4EZuTcipSlf3BBama/97UwP70Wqupo4eu2RuN3rb3Gz8A5Lx3GkMYMpSDyIHw7ctqxljN/HhgoAugotLGyUimeTVi1t7GmHo2DgV9Kc9kvxaljxYcCm387Yo9v58kqRnKvz2IrClgWc8rOGShno9VQ98nllF82e3+q+ZaDt0oTHqCCB7NUWWQfQX05J70GVtjA724CJUHwvwNyQSd28qfH7ntV03fQzxt4/Qx2wX/SpB0c9jKbCpZlgbUrW0xDIqhJfZek0PYFb7JTlulcy3sftRVCAU=
+    - secure: "gzti+qnv1e+2U4CDFs1rymwdurrAnA3Zc2w1LJtSl5k2B84hTi1HqM7DON28GTry2TjMGSDTOmcYDZkDo6CeV1doQZUjS+aB8uix00rmJcPwoODoP8QWmNgMtjuHkAmUvaEjNETtwRsYKzE6jR6comv0gaWzGUm5Hr/YbDPx+mPmu0Mo5Sfi6iDK7zwOpZdDsbRu+H8czogAB1gTlJ9YLtkDZjIafaqL1FSkDGhIxXcrdhUuK2prG/K+BQYJypnpcc82kuAAwIWKXvJ2DPjftTrlRFDEGF9jcFbRKWwoFFQ+OGl/BHfQ00wlHshwbX33GaTB7Lg3DaFI7rQPOfHz0Z6+aE6RDEozK1TWj8oFl+vIqUzB4SQ0YefY7ZdHtsHiwKiRG7uJpBmnqLLZiyOy4+xb9UQIlaLbisT4vteqr4Q1PDoLmhZKt2MwSRpxrtL9j/TGEMJeIFVGKChB7WL0zpQJ+89V9ECguhe/DIcUx0AsfHozPHIqoPpafmIiteUDMNBYUtwYLlNoHsgZ6XBFXvu8C+x4R9vMsIme5aQjCh4n27Zg6JkuNapXLvXToyukx2+7Zvrjpyaerpgfhhs/L8Z4v0Zg31AijwHOsvehQm4gUxDNwPwLGNRvB1gaoLs7cB7IVC3PD7hrayV+RFbdHwPuImNu5xH4kAhDa9MijnY="
+    - secure: "kKoB2L6m7IOPpJSB6FcTDd5OpSvYjGpBffsX075USxADHpasXBEQ0IXxEuFRzl4nfADKzDsUpcQIGim8RhxBVGKHeg7iRLpcjIbywNBt53ExaoxxIQFxBlWrAJqNgAerrXlJ3MGgZ8rsxDHfLZ1g1iPLd23TGUU6RCkSALqdQRN96IynUbNPj4RP5WWuO1GtQEWpaBnClh1pZbCiPDUCtBE4kTssbZFwoaqcCZ8ePm6w+pz1o89hOyczbLE6eBi6cVUPgsuywS4xZhHta8o67Nu4l8OrJQOptRmjjzsXI/+t/D9ZWJZw+MefMG479mSq3cjGqRvWuRXgEbM/+mpCHmvID7LTgk8QLuPb13wPT1usnDoSJirzqEXO4kKuAtoeicPs6hDnhRJxq5yUgKIrSEL+if1K+pLMWZmzTHJbOdhdiJvOkZspC5RK7mCWalnv8q3molamdZu3VujvuMyshVozwygWUhyRDVa6SKQKXP6Xe6vayGa+6RFol1koSB6C71qyMzP65Tl4ozJTJe05XQvbxMapq/kZ0FYLRpNoqVzRWGQk8XJyyOPS8rKuHBmoSkdtY20PBd46dRn5qdivCtaPUeHiuIymO5fFveuyD8CNvodt5hOXmMOasC+JMdJIY73BffSjQ2lxG+Bl1ALKSadvBIuAmUGtcrfUL7Feu3g="
+    - secure: "pnkppZ6iYB5wDELlRMIVTw4tP4xfh5Vy79DX5BGWdX2LEtoVwU7cvoj6MQwVqWHDttrw9VtexywPVERme3nsscRm0RN9JjZME/zqblVGQTcIH95zaNOmrEtGXJF95x7CZg+bhnEBTSIkqpkUBibQnFQDV+eD0e1SfszhE/KVeZ43Iys4j//FqQS3hKvoYK69BpqwGr64a3wFdnOXXFNSqMPlZv62FwIBR46Alc3KC3HUxm3yQFLDyXWw8GXaFQWXrFi2PZtQLuWnobbGkxsKpiLLhGwSKRC7YDmJ8kt3Qees9Koo53q0sgaMQ5m7B2clA265RC5TrO6EfUC56reICKkSGIMj0NiCPhBDp+m5jRL81eCDqLj/J5sj/iNXH5i81ffcSRpZ9zAyrQ2V/DwymxUC3T3DR+mR5w85yjHSBDy157fgg36omYcMa33mkqfpqSiBX2tRXScZ56Rp6uFrtJ7RMp1nURDectYz/0tP6lj9N5E6kf/GuoiKhai1v/yjwjzBLPx3yk1YlOGk0SgkQSid7ijXrt9tIoSzSW9TGUZ5rYrlMjZfHRBzOX9u9y34KveKsaKn7XohFs3Z6prUTT0FJO1Ao+wxyRnWqz+96MQpkrLm/xpg00UPdOA9uQeBHbhRI9RCKvmuPO7kzeLeKfy8mvoanMWn/H+u54rCbmk="
