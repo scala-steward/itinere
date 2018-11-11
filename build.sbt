@@ -183,7 +183,7 @@ def publishSettings = Seq(
       "scm:git:git@github.com:vectos/itinere.git"
     )
   ),
-  releaseEarlyWith := BintrayPublisher,
+  releaseEarlyWith := SonatypePublisher,
   pgpPublicRing := file("./travis/local.pubring.asc"),
   pgpSecretRing := file("./travis/local.secring.asc")
 )
