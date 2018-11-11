@@ -14,9 +14,10 @@ cache:
   - $HOME/.ivy2/cache
   - $HOME/.sbt
 before_cache:
-# Cleanup the cached directories to avoid unnecessary cache updates
-- find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
-- find $HOME/.sbt        -name "*.lock"               -print -delete
+- du -h -d 1 $HOME/.ivy2/cache
+- du -h -d 2 $HOME/.sbt/
+- find $HOME/.sbt -name "*.lock" -type f -delete
+- find $HOME/.ivy2/cache -name "ivydata-*.properties" -type f -delete
 env:
   global:
     - secure: "gzti+qnv1e+2U4CDFs1rymwdurrAnA3Zc2w1LJtSl5k2B84hTi1HqM7DON28GTry2TjMGSDTOmcYDZkDo6CeV1doQZUjS+aB8uix00rmJcPwoODoP8QWmNgMtjuHkAmUvaEjNETtwRsYKzE6jR6comv0gaWzGUm5Hr/YbDPx+mPmu0Mo5Sfi6iDK7zwOpZdDsbRu+H8czogAB1gTlJ9YLtkDZjIafaqL1FSkDGhIxXcrdhUuK2prG/K+BQYJypnpcc82kuAAwIWKXvJ2DPjftTrlRFDEGF9jcFbRKWwoFFQ+OGl/BHfQ00wlHshwbX33GaTB7Lg3DaFI7rQPOfHz0Z6+aE6RDEozK1TWj8oFl+vIqUzB4SQ0YefY7ZdHtsHiwKiRG7uJpBmnqLLZiyOy4+xb9UQIlaLbisT4vteqr4Q1PDoLmhZKt2MwSRpxrtL9j/TGEMJeIFVGKChB7WL0zpQJ+89V9ECguhe/DIcUx0AsfHozPHIqoPpafmIiteUDMNBYUtwYLlNoHsgZ6XBFXvu8C+x4R9vMsIme5aQjCh4n27Zg6JkuNapXLvXToyukx2+7Zvrjpyaerpgfhhs/L8Z4v0Zg31AijwHOsvehQm4gUxDNwPwLGNRvB1gaoLs7cB7IVC3PD7hrayV+RFbdHwPuImNu5xH4kAhDa9MijnY="
