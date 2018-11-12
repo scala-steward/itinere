@@ -7,8 +7,7 @@ import cats.effect.Sync
 import cats.implicits._
 import com.github.ghik.silencer.silent
 import itinere.HttpEndpointAlgebra
-import org.http4s.implicits._
-import org.http4s.{HttpRoutes, MalformedMessageBodyFailure, Status, Response => Resp}
+import org.http4s.{HttpRoutes, Response => Resp}
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -41,19 +40,6 @@ abstract class Http4sServer extends HttpEndpointAlgebra with Http4sServerRespons
   @silent
   def measurementHandler(requestLatency: RequestMessage[FiniteDuration], responseStatusCode: Int): F[Unit] = F.unit
 
-  def errorHandler(error: Throwable): Resp[F] = error match {
-    case u: UriDecodeFailure =>
-      Resp(Status.BadRequest).withEntity(u.message)
-    case u: HeaderDecodeFailure =>
-      Resp(Status.BadRequest).withEntity(u.message)
-    case MalformedMessageBodyFailure(err, _) =>
-      Resp(Status.BadRequest).withEntity(err)
-    case _ =>
-      Resp(Status.InternalServerError).withEntity("Internal server error")
-  }
-
-  val handlers: HttpRoutes[F]
-
-  final def router = handlers.orNotFound.handleError(errorHandler)
+  val routes: HttpRoutes[F]
 
 }

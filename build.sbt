@@ -62,6 +62,7 @@ val tests = project
       "org.typelevel"  %% "discipline"        % "0.10.0"                      % Test,
       "com.propensive" %% "magnolia"          % "0.10.0"                      % Test,
       "org.http4s"     %% "http4s-circe"      % "0.20.0-M2"                   % Test,
+      "org.http4s"     %% "http4s-dsl"        % "0.20.0-M2"                   % Test,
       "io.circe"       %% "circe-literal"     % "0.10.0"                      % Test,
       "org.specs2"     %% "specs2-core"       % "4.3.4"                       % Test,
       "org.specs2"     %% "specs2-scalacheck" % "4.3.4"                       % Test,

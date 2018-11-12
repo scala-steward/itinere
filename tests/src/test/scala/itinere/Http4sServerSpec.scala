@@ -6,12 +6,13 @@ import cats.implicits._
 import eu.timepit.refined._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.Error
 import io.circe.literal._
+import io.circe.Error
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{Http4sServer, Http4sServerJson}
+import itinere.http4s_server.{HeaderDecodeFailure, Http4sServer, Http4sServerJson, UriDecodeFailure}
 import org.http4s._
 import org.http4s.circe._
+import org.http4s.implicits._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
 import shapeless._
 
@@ -102,14 +103,26 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp.as[String] must returnValue("Failed to decode segment color")
       }
     }
+
+    "composing multiple HttpRoutes via Router should work" >> {
+      val router = AppService.routes <+> Server.routes
+
+      val serverResponse = serve(get(Uri.uri("/users/1"), Header("X-Token", "23") :: Header("X-ValidTill", "1234") :: Nil), router)
+      serverResponse must returnStatus(Status.Ok)
+      serverResponse.as[io.circe.Json] must returnValue(json"""{"value": {"id": 1, "name": "Klaas", "age": 3}}""")
+
+      val statusResponse = serve(get(Uri.uri("/status")), router)
+      statusResponse must returnStatus(Status.Ok)
+      statusResponse.as[String] must returnValue("Alive!")
+    }
   }
 
   def returnStatus(status: Status): Matcher[Response[IO]] = { s: Response[IO] =>
     s.status must beEqualTo(status)
   }
 
-  private def serve(request: IO[Request[IO]]): Response[IO] =
-    request.flatMap(Server.router.run).unsafeRunSync()
+  private def serve(request: IO[Request[IO]], routes: HttpRoutes[IO] = Server.routes): Response[IO] =
+    request.flatMap(routes.orNotFound.handleError(errorHandler).run).unsafeRunSync()
 
   private def post[A](uri: Uri, body: A)(implicit E: EntityEncoder[IO, A]): IO[Request[IO]] =
     IO.pure(Request(Method.POST, uri, body = E.toEntity(body).body))
@@ -119,6 +132,17 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
 
   private def delete[A](uri: Uri, headers: List[Header] = Nil): IO[Request[IO]] =
     IO.pure(Request(Method.DELETE, uri, headers = Headers(headers)))
+
+  private def errorHandler(error: Throwable): Response[IO] = error match {
+    case u: UriDecodeFailure =>
+      Response(Status.BadRequest).withEntity(u.message)
+    case u: HeaderDecodeFailure =>
+      Response(Status.BadRequest).withEntity(u.message)
+    case MalformedMessageBodyFailure(_, Some(err: Error)) =>
+      Response(Status.BadRequest).withEntity(Show[Error].show(err))
+    case _ =>
+      Response(Status.InternalServerError)
+  }
 }
 
 trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPrimitives {
@@ -138,12 +162,12 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
       .as[DomainResponse[A]]
 
   val userRegister =
-  POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
-  response(HttpStatus.Ok, entity = jsonResponse(Json.string))
+    POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
+    response(HttpStatus.Ok, entity = jsonResponse(Json.string))
 
   val userList =
-  GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
-  response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
+    GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
+    response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
   val userGet = GET(path / "users" / userId, authInfo) ~> domainResponse(User.json)
 
@@ -151,18 +175,22 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
 
 }
 
+object AppService {
+  import org.http4s.dsl.io._
+
+  val routes: HttpRoutes[IO] = {
+    HttpRoutes.of[IO] {
+      case GET -> Root / "status" =>
+        Ok("Alive!")
+    }
+  }
+}
+
 object Server extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
   override type F[A] = IO[A]
   override def F: Sync[IO] = Sync[IO]
 
-  override def errorHandler(error: Throwable): Response[IO] = error match {
-    case MalformedMessageBodyFailure(_, Some(err: Error)) =>
-      Response(Status.BadRequest).withEntity(Show[Error].show(err))
-    case err =>
-      super.errorHandler(err)
-  }
-
-  val handlers =
+  val routes =
   userRegister.implementedBy(r => IO.pure(r.name)) <+>
   userList.implementedBy(_ => IO.pure(List.empty)) <+>
   userDelete.implementedBy(_ => IO.pure(HNil)) <+>
