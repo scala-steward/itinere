@@ -1,14 +1,12 @@
 language: scala
+sudo: true
 git:
   depth: 9999
 scala:
 - 2.12.7
 jdk:
 - oraclejdk8
-before_install:
-- if [ $TRAVIS_PULL_REQUEST = 'false' ]; then openssl aes-256-cbc -K $encrypted_3e9694bf1fbc_key -iv $encrypted_3e9694bf1fbc_iv -in travis/secrets.tar.enc -out travis/secrets.tar -d; tar xv -C travis -f travis/secrets.tar; fi
-install:
-- pip install --user codecov
+
 cache:
   directories:
   - $HOME/.ivy2/cache
@@ -33,8 +31,12 @@ stages:
 jobs:
   include:
   - stage: test
+    install:
+    - pip install --user codecov
     script:
     - sbt validateCoverage
     - codecov
   - stage: release
+    before_install:
+    - if [ $TRAVIS_PULL_REQUEST = 'false' ]; then openssl aes-256-cbc -K $encrypted_3e9694bf1fbc_key -iv $encrypted_3e9694bf1fbc_iv -in travis/secrets.tar.enc -out travis/secrets.tar -d; tar xv -C travis -f travis/secrets.tar; fi
     script: sbt releaseEarly

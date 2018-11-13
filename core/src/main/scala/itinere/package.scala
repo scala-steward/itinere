@@ -9,6 +9,6 @@ package object itinere {
     def as[B](implicit T: Transformer[F, A, B]): F[B] = T(fa)
   }
 
-  def member[A, B](avro: Json[A], getter: B => A, documentation: Option[String] = None): Member[Json, A, B] =
-    Member[Json, A, B](avro, getter, documentation)
+  def member[A, B](json: Json[A], getter: B => A, documentation: Option[String] = None): Member[Json, A, B] =
+    Member[Json, A, B](json, getter, documentation)
 }

@@ -89,8 +89,8 @@ trait CirceJsonLike extends JsonLike {
   override def jsonDecoder[A](json: Json[A]): FromJson[A] = new FromJson[A] {
     override def decode(input: String): Attempt[A] =
       for {
-        jsonValue <- Attempt.fromThrowable(io.circe.parser.parse(input))
-        value     <- Attempt.fromThrowable(json.apply[Decoder].decodeJson(jsonValue))
+        jsonValue <- Attempt.fromThrowable(io.circe.parser.parse(input), "Json parse error")
+        value     <- Attempt.fromThrowable(json.apply[Decoder].decodeJson(jsonValue), "Json decode error")
       } yield value
   }
 

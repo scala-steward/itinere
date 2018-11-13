@@ -1,8 +1,13 @@
 package itinere
 import java.util.UUID
 
-import itinere.refined._
+import eu.timepit.refined._
+import eu.timepit.refined.string._
+import eu.timepit.refined.numeric._
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Interval
 import eu.timepit.refined.types.numeric.{PosInt, PosLong}
+import itinere.refined._
 
 sealed trait BookingProcess
 object BookingProcess {
@@ -90,27 +95,27 @@ final case class ListFilter(
 )
 
 final case class RegisterUser(
-  name: String,
-  age: PosInt
+  name: String Refined MatchesRegex[W.`"([A-Za-z]{3,32})"`.T],
+  age: Int Refined Interval.Open[W.`0`.T, W.`150`.T]
 )
 
 final case class User(
   id: PosLong,
   name: String,
-  age: PosInt
+  age: Int Refined Interval.Open[W.`0`.T, W.`150`.T]
 )
 object User {
   val json: Json[User] = Json.object3("User")(User.apply)(
     "id"   -> member(Json.long.positive, _.id),
     "name" -> member(Json.string, _.name),
-    "age"  -> member(Json.int.positive, _.age)
+    "age"  -> member(Json.int.intervalOpen, _.age)
   )
 }
 
 object RegisterUser {
   val json: Json[RegisterUser] = Json.object2("RegisterUser")(RegisterUser.apply)(
-    "name" -> member(Json.string, _.name),
-    "age"  -> member(Json.int.positive, _.age)
+    "name" -> member(Json.string.matchesRegex, _.name),
+    "age"  -> member(Json.int.intervalOpen, _.age)
   )
 }
 

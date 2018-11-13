@@ -32,8 +32,8 @@ object Attempt {
     case Some(value) => success(value)
   }
 
-  def fromThrowable[L, R](t: Either[Throwable, R]): Attempt[R] = t match {
-    case Left(err)    => error(err.getMessage, Some(err))
+  def fromThrowable[L, R](t: Either[Throwable, R], ifError: => String): Attempt[R] = t match {
+    case Left(err)    => error(ifError, Some(err))
     case Right(value) => success(value)
   }
 

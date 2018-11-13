@@ -27,11 +27,11 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp.as[io.circe.Json] must returnValue(json""""Mark"""")
       }
 
-      "return http 400 bad_request" >> {
+      "return http 400 bad_request when .age < 0" >> {
         val resp = serve(post(Uri.uri("/users/register"), json"""{"name": "Mark", "age": -1 }"""))
 
         resp must returnStatus(Status.BadRequest)
-        resp.as[String] must returnValue("DecodingFailure at .age: Predicate failed: (-1 > 0).")
+        resp.as[String] must returnValue("DecodingFailure at .age: Left predicate of ((-1 > 0) && (-1 < 150)) failed: Predicate failed: (-1 > 0).")
       }
     }
 
@@ -162,12 +162,12 @@ trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPri
       .as[DomainResponse[A]]
 
   val userRegister =
-    POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
-    response(HttpStatus.Ok, entity = jsonResponse(Json.string))
+  POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
+  response(HttpStatus.Ok, entity = jsonResponse(Json.string))
 
   val userList =
-    GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
-    response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
+  GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
+  response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
 
   val userGet = GET(path / "users" / userId, authInfo) ~> domainResponse(User.json)
 
@@ -191,7 +191,7 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   override def F: Sync[IO] = Sync[IO]
 
   val routes =
-  userRegister.implementedBy(r => IO.pure(r.name)) <+>
+  userRegister.implementedBy(r => IO.pure(r.name.value)) <+>
   userList.implementedBy(_ => IO.pure(List.empty)) <+>
   userDelete.implementedBy(_ => IO.pure(HNil)) <+>
   userGet.implementedBy { case uid :: _ :: _ => IO.pure(if (uid.value == 1l) DomainResponse.Success(User(uid, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
