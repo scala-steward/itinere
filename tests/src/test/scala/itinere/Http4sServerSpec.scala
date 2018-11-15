@@ -1,18 +1,22 @@
 package itinere
 
 import cats.Show
+import cats.effect.concurrent.Ref
 import cats.effect.{IO, Sync}
 import cats.implicits._
+import cats.kernel.{Monoid}
 import eu.timepit.refined._
 import io.circe.literal._
 import io.circe.Error
 import itinere.circe.CirceJsonLike
-import itinere.http4s_server.{HeaderDecodeFailure, Http4sServer, Http4sServerJson, UriDecodeFailure}
+import itinere.http4s_server._
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.implicits._
 import org.specs2.matcher.{IOMatchers, Matcher, Matchers}
 import shapeless._
+
+import scala.concurrent.duration.FiniteDuration
 
 class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers with Matchers {
 
@@ -100,10 +104,19 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         resp must returnStatus(Status.BadRequest)
         resp.as[String] must returnValue("Failed to decode segment color")
       }
+
+      "return http 500 internal_server_error when invalid color is given" >> {
+        val resp = serve(delete(Uri.uri("/users/1/green")))
+
+        resp must returnStatus(Status.InternalServerError)
+        resp.as[String] must returnValue("Internal error occurred")
+
+        ref.get.unsafeRunSync().get("users/:userId/:color") must beSome(EndpointStats(Map(200 -> 1, 500 -> 1)))
+      }
     }
 
     "composing multiple HttpRoutes via Router should work" >> {
-      val router = AppService.routes <+> Server.routes
+      val router = AppService.routes <+> server.routes
 
       val serverResponse = serve(get(Uri.uri("/users/1"), Header("X-Token", "23") :: Header("X-ValidTill", "1234") :: Nil), router)
       serverResponse must returnStatus(Status.Ok)
@@ -119,8 +132,8 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
     s.status must beEqualTo(status)
   }
 
-  private def serve(request: IO[Request[IO]], routes: HttpRoutes[IO] = Server.routes): Response[IO] =
-    request.flatMap(routes.orNotFound.handleError(errorHandler).run).unsafeRunSync()
+  private def serve(request: IO[Request[IO]], routes: HttpRoutes[IO] = server.routes): Response[IO] =
+    request.flatMap(routes.orNotFound.run(_).handleErrorWith(server.errorHandler)).unsafeRunSync()
 
   private def post[A](uri: Uri, body: A)(implicit E: EntityEncoder[IO, A]): IO[Request[IO]] =
     IO.pure(Request(Method.POST, uri, body = E.toEntity(body).body))
@@ -131,16 +144,8 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
   private def delete[A](uri: Uri, headers: List[Header] = Nil): IO[Request[IO]] =
     IO.pure(Request(Method.DELETE, uri, headers = Headers(headers)))
 
-  private def errorHandler(error: Throwable): Response[IO] = error match {
-    case u: UriDecodeFailure =>
-      Response(Status.BadRequest).withEntity(u.message)
-    case u: HeaderDecodeFailure =>
-      Response(Status.BadRequest).withEntity(u.message)
-    case MalformedMessageBodyFailure(_, Some(err: Error)) =>
-      Response(Status.BadRequest).withEntity(Show[Error].show(err))
-    case _ =>
-      Response(Status.InternalServerError)
-  }
+  lazy val ref = Ref.of[IO, Map[String, EndpointStats]](Map.empty).unsafeRunSync()
+  lazy val server = new TestServer(ref)
 }
 
 object AppService {
@@ -154,14 +159,40 @@ object AppService {
   }
 }
 
-object Server extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
+case class EndpointStats(hits: Map[Int, Int])
+
+object EndpointStats {
+
+  implicit val monoid: Monoid[EndpointStats] = new Monoid[EndpointStats] {
+    override def empty: EndpointStats = EndpointStats(Map.empty)
+    override def combine(x: EndpointStats, y: EndpointStats): EndpointStats =
+      EndpointStats(Monoid[Map[Int, Int]].combine(x.hits, y.hits))
+  }
+}
+
+class TestServer(measurements: Ref[IO, Map[String, EndpointStats]]) extends Http4sServer with Endpoints with Http4sServerJson with CirceJsonLike {
   override type F[A] = IO[A]
   override def F: Sync[IO] = Sync[IO]
 
+  override def measurementHandler(requestLatency: RequestMessage[FiniteDuration], responseStatusCode: Int): IO[Unit] =
+    measurements.update(_ |+| Map(requestLatency.uri -> EndpointStats(Map(responseStatusCode -> 1))))
+
+  override def errorHandler(error: Throwable): IO[Response[IO]] = error match {
+    case u: UriDecodeFailure =>
+      IO.pure(Response(Status.BadRequest).withEntity(u.message))
+    case u: HeaderDecodeFailure =>
+      IO.pure(Response(Status.BadRequest).withEntity(u.message))
+    case MalformedMessageBodyFailure(_, Some(err: Error)) =>
+      IO.pure(Response(Status.BadRequest).withEntity(Show[Error].show(err)))
+    case err =>
+      super.errorHandler(err)
+  }
+
+  //these endpoint return gibberish output, but it's sufficient for testing
   val routes =
   userRegister.implementedBy(r => IO.pure(r.name.value)) <+>
   userList.implementedBy(_ => IO.pure(List.empty)) <+>
-  userDelete.implementedBy { case uid :: _ :: _ => IO.pure(s"Deleted user ${uid.value}") } <+>
+  userDelete.implementedBy { case uid :: c :: _ => if (c == Color.Red) IO.pure(s"Deleted user ${uid.value}") else IO.raiseError(new Throwable("Only the color red can be deleted!")) } <+>
   userGet.implementedBy { case uid :: _ :: _    => IO.pure(if (uid.value == 1l) DomainResponse.Success(User(uid, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }
