@@ -1,0 +1,9 @@
+pull_request_rules:
+  - name: Automatic merge for scala-steward pull requests on master
+    conditions:
+      - author=scala-steward
+      - status-success=continuous-integration/travis-ci/pr
+      - base=master
+    actions:
+      merge:
+        method: merge
