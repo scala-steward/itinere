@@ -1,6 +1,6 @@
 package itinere
 
-import cats.Invariant
+import cats.{Invariant, Show}
 import cats.implicits._
 import shapeless._
 
@@ -9,11 +9,8 @@ trait HttpEndpointAlgebra extends HttpRequestAlgebra with HttpResponseAlgebra {
   type HttpResponse[A]
   type HttpEndpoint[A, B]
 
-  def endpoint[A, B](request: HttpRequest[A], response: HttpResponse[B], description: Option[String] = None): HttpEndpoint[A, B]
+  def endpoint[A, B, C: Show](request: HttpRequest[A], response: HttpResponse[B], tag: C, summary: String): HttpEndpoint[A, B]
 
-  implicit class HttpRequestOps[A](req: HttpRequest[A]) {
-    def ~>[B](resp: HttpResponse[B]): HttpEndpoint[A, B] = endpoint(req, resp)
-  }
 }
 
 trait UrlAlgebra {
@@ -65,8 +62,8 @@ trait HttpResponseAlgebra {
 
   val HttpStatus: HttpStatusCodes[HttpStatus]
 
-  final class CoproductHttpResponseBuilder[B <: Coproduct](coproduct: HttpResponse[B]) {
-    def add[A](resp: HttpResponse[A]): CoproductHttpResponseBuilder[A :+: B] = {
+  final class AnyOfResponse[B <: Coproduct](coproduct: HttpResponse[B]) {
+    def opt[A](resp: HttpResponse[A]): AnyOfResponse[A :+: B] = {
       val newCoproduct = httpResponseCocartesian
         .sum(resp, coproduct)
         .imap {
@@ -77,19 +74,18 @@ trait HttpResponseAlgebra {
           case Inr(r) => Right(r)
         }
 
-      new CoproductHttpResponseBuilder(newCoproduct)
+      new AnyOfResponse(newCoproduct)
     }
     def as[A](implicit T: Transformer[HttpResponse, B, A]) = T(coproduct)
   }
 
-  def coproductResponseBuilder = new CoproductHttpResponseBuilder(cnil)
+  def anyOf = new AnyOfResponse(cnil)
 
   def emptyResponseHeaders: HttpResponseHeaders[HNil]
 
-  def emptyResponse: HttpResponseEntity[HNil]
   def cnil: HttpResponse[CNil]
 
-  def response[A, B](statusCode: HttpStatus, headers: HttpResponseHeaders[A] = emptyResponseHeaders, entity: HttpResponseEntity[B] = emptyResponse)(implicit T: Tupler[A, B]): HttpResponse[T.Out]
+  def response[A, B](statusCode: HttpStatus, description: String, headers: HttpResponseHeaders[A] = emptyResponseHeaders, entity: HttpResponseEntity[B])(implicit T: Tupler[A, B]): HttpResponse[T.Out]
 
   implicit val httpResponseResponseHeadersInvariantFunctor: Invariant[HttpResponseHeaders]
   implicit val httpResponseEntityInvariantFunctor: Invariant[HttpResponseEntity]
@@ -122,15 +118,6 @@ trait HttpRequestAlgebra extends UrlAlgebra {
 
   def request[A, B, C, AB](method: HttpMethod, url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out]
 
-  def GET[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
-    request(HttpMethod.GET, url, headers, emptyRequestEntity)
-
-  def POST[A, B, C, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders, entity: HttpRequestEntity[C] = emptyRequestEntity)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, C]): HttpRequest[TO.Out] =
-    request(HttpMethod.POST, url, headers, entity)
-
-  def DELETE[A, B, AB](url: Url[A], headers: HttpRequestHeaders[B] = emptyRequestHeaders)(implicit T: Tupler.Aux[A, B, AB], TO: Tupler[AB, HNil]): HttpRequest[TO.Out] =
-    request(HttpMethod.DELETE, url, headers, emptyRequestEntity)
-
   implicit val httpRequestHeadersInvariantFunctor: Invariant[HttpRequestHeaders]
   implicit val httpRequestEntityInvariantFunctor: Invariant[HttpRequestEntity]
   implicit val httpRequestInvariantFunctor: Invariant[HttpRequest]
@@ -145,6 +132,6 @@ trait JsonLike {
 }
 
 trait HttpJsonAlgebra { self: HttpRequestAlgebra with HttpResponseAlgebra =>
-  def jsonResponse[A](json: Json[A], description: Option[String] = None): HttpResponseEntity[A]
-  def jsonRequest[A](json: Json[A], description: Option[String] = None): HttpRequestEntity[A]
+  def jsonResponse[A](json: Json[A]): HttpResponseEntity[A]
+  def jsonRequest[A](json: Json[A]): HttpRequestEntity[A]
 }

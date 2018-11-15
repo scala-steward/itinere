@@ -1,7 +1,5 @@
 package itinere.circe
 
-import java.util.UUID
-
 import cats.implicits._
 import io.circe.{Decoder, Encoder}
 import itinere._
@@ -23,8 +21,6 @@ trait CirceJsonLike extends JsonLike {
     override val bool: Decoder[Boolean] = Decoder.decodeBoolean
 
     override val cnil: Decoder[CNil] = Decoder.const(null)
-
-    override val uuid: Decoder[UUID] = Decoder.decodeUUID
 
     override def option[A](from: Decoder[A]): Decoder[Option[A]] = Decoder.decodeOption(from)
 
@@ -59,8 +55,6 @@ trait CirceJsonLike extends JsonLike {
     override val cnil: Encoder[CNil] = new Encoder[CNil] {
       override def apply(a: CNil): io.circe.Json = io.circe.Json.Null
     }
-
-    override val uuid: Encoder[UUID] = Encoder.encodeUUID
 
     override def option[A](from: Encoder[A]): Encoder[Option[A]] = Encoder.encodeOption(from)
 

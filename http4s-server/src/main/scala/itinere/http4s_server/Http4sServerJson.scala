@@ -8,10 +8,10 @@ import org.http4s._
 
 trait Http4sServerJson extends HttpJsonAlgebra { self: Http4sServer with JsonLike =>
 
-  override def jsonResponse[A](json: Json[A], description: Option[String]): HttpResponseEntity[A] =
+  override def jsonResponse[A](json: Json[A]): HttpResponseEntity[A] =
     EntityEncoder.stringEncoder[F].contramap(jsonEncoder(json).encode(_))
 
-  override def jsonRequest[A](json: Json[A], description: Option[String]): HttpRequestEntity[A] = new HttpRequestEntity[A] {
+  override def jsonRequest[A](json: Json[A]): HttpRequestEntity[A] = new HttpRequestEntity[A] {
     override def decode(msg: Message[F], strict: Boolean): DecodeResult[F, A] = EitherT {
       F.map(msg.body.through(text.utf8Decode).compile.foldMonoid)(
         t =>

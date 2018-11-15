@@ -1,7 +1,5 @@
 package itinere
 
-import java.util.UUID
-
 import cats.Invariant
 import shapeless.{:+:, CNil, Coproduct, Inl, Inr}
 
@@ -37,10 +35,6 @@ object Json extends JsonDslFormatN { self =>
 
   val cnil: Json[CNil] = new Json[CNil] {
     override def apply[F[_]: JsonAlgebra]: F[CNil] = implicitly[JsonAlgebra[F]].cnil
-  }
-
-  val uuid: Json[UUID] = new Json[UUID] {
-    override def apply[F[_]: JsonAlgebra]: F[UUID] = implicitly[JsonAlgebra[F]].uuid
   }
 
   def imap[A, B](fa: Json[A])(f: A => B)(g: B => A): Json[B] = new Json[B] {

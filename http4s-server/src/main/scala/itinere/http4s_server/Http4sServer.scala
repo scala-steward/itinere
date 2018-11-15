@@ -2,6 +2,7 @@ package itinere.http4s_server
 
 import java.util.concurrent.TimeUnit
 
+import cats.Show
 import cats.data.{Kleisli, OptionT}
 import cats.effect.Sync
 import cats.implicits._
@@ -34,7 +35,7 @@ abstract class Http4sServer extends HttpEndpointAlgebra with Http4sServerRespons
       _ <- measurementHandler(RequestMessage(message.method, message.uri, FiniteDuration(end - start, TimeUnit.MILLISECONDS)), resp.status.code)
     } yield resp
 
-  final def endpoint[A, B](request: HttpRequest[A], response: HttpResponse[B], description: Option[String]): HttpEndpoint[A, B] =
+  final def endpoint[A, B, C: Show](request: HttpRequest[A], response: HttpResponse[B], tag: C, summary: String): HttpEndpoint[A, B] =
     HttpEndpoint(request, response)
 
   @silent

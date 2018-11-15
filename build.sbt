@@ -31,7 +31,7 @@ val `http4s-server` = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M2"
+      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M3"
     )
   )
   .dependsOn(core)
@@ -52,25 +52,52 @@ val circe = project
   )
   .dependsOn(core)
 
+val `openapi` = project
+  .in(file("open-api"))
+  .settings(commonSettings("open-api"))
+  .settings(publishSettings)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.higherkindness" %% "droste-core" % "0.5.0"
+    ),
+    coverageExcludedPackages := "itinere.openapi.*FormatN",
+    sourceGenerators in Compile += (sourceManaged in Compile)
+      .map(Boilerplate.gen(Boilerplate.openapiTemplates))
+      .taskValue
+  )
+  .dependsOn(core)
+
+val `openapi-circe` = project
+  .in(file("open-api-circe"))
+  .settings(commonSettings("open-api-circe"))
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.circe" %% "circe-core" % "0.10.1"
+    ),
+  )
+  .settings(publishSettings)
+  .dependsOn(`openapi`)
+
 val tests = project
   .in(file("tests"))
   .settings(noPublishSettings)
   .settings(commonSettings("tests"))
   .settings(
     libraryDependencies ++= Seq(
-      "org.typelevel"  %% "cats-laws"         % catsVersion                   % Test,
-      "org.typelevel"  %% "discipline"        % "0.10.0"                      % Test,
-      "com.propensive" %% "magnolia"          % "0.10.0"                      % Test,
-      "org.http4s"     %% "http4s-circe"      % "0.20.0-M2"                   % Test,
-      "org.http4s"     %% "http4s-dsl"        % "0.20.0-M2"                   % Test,
-      "io.circe"       %% "circe-literal"     % "0.10.0"                      % Test,
-      "org.specs2"     %% "specs2-core"       % "4.3.4"                       % Test,
-      "org.specs2"     %% "specs2-scalacheck" % "4.3.4"                       % Test,
-      "org.specs2"     %% "specs2-cats"       % "4.3.5-78abffa2e-20181150936" % Test,
-      "org.scalacheck" %% "scalacheck"        % "1.13.5"                      % Test
+      "io.swagger.parser.v3" % "swagger-parser"     % "2.0.5"                       % Test,
+      "org.typelevel"        %% "cats-laws"         % catsVersion                   % Test,
+      "org.typelevel"        %% "discipline"        % "0.10.0"                      % Test,
+      "com.propensive"       %% "magnolia"          % "0.10.0"                      % Test,
+      "org.http4s"           %% "http4s-circe"      % "0.20.0-M3"                   % Test,
+      "org.http4s"           %% "http4s-dsl"        % "0.20.0-M3"                   % Test,
+      "io.circe"             %% "circe-literal"     % "0.10.0"                      % Test,
+      "org.specs2"           %% "specs2-core"       % "4.3.4"                       % Test,
+      "org.specs2"           %% "specs2-scalacheck" % "4.3.4"                       % Test,
+      "org.specs2"           %% "specs2-cats"       % "4.3.5-78abffa2e-20181150936" % Test,
+      "org.scalacheck"       %% "scalacheck"        % "1.13.5"                      % Test
     )
   )
-  .dependsOn(core, `http4s-server`, circe, refined)
+  .dependsOn(core, `http4s-server`, circe, refined, `openapi`, `openapi-circe`)
 
 val docs = project
   .in(file("docs"))
@@ -202,4 +229,4 @@ cmdAlias("format", scalafmtAlias)
 val root = project
   .in(file("."))
   .settings(commonSettings("root") ++ noPublishSettings)
-  .aggregate(core, refined, circe, `http4s-server`)
+  .aggregate(core, refined, circe, `http4s-server`, `openapi`, `openapi-circe`)

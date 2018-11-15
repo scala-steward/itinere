@@ -18,11 +18,9 @@ trait Http4sServerResponse extends HttpResponseAlgebra { self: Http4sServer =>
 
   def emptyResponseHeaders: HNil => Headers = _ => Headers.empty
 
-  def emptyResponse: EntityEncoder[F, HNil] = EntityEncoder.emptyEncoder[F, HNil]
-
   def cnil: CNil => Resp[F] = _ => Resp[F](Status.Forbidden, body = Stream.empty)
 
-  def response[A, B](statusCode: HttpStatus, headers: HttpResponseHeaders[A], entity: HttpResponseEntity[B])(implicit T: Tupler[A, B]): T.Out => Resp[F] = out => {
+  def response[A, B](statusCode: HttpStatus, description: String, headers: HttpResponseHeaders[A], entity: HttpResponseEntity[B])(implicit T: Tupler[A, B]): T.Out => Resp[F] = out => {
     val (a, b) = T.unapply(out)
     val h = headers(a)
     val e = entity.toEntity(b).body

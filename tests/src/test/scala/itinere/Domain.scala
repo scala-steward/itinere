@@ -1,6 +1,6 @@
 package itinere
-import java.util.UUID
 
+import cats.Show
 import eu.timepit.refined._
 import eu.timepit.refined.string._
 import eu.timepit.refined.numeric._
@@ -50,7 +50,6 @@ final case class SupportedTypes(
   float: Float,
   string: String,
   boolean: Boolean,
-  uuid: UUID,
   option: Option[Int],
   list: List[Int],
   vector: Vector[Int],
@@ -64,14 +63,13 @@ final case class SupportedTypes(
 
 object SupportedTypes {
 
-  val json: Json[SupportedTypes] = Json.object16("AllTypes")(SupportedTypes.apply)(
+  val json: Json[SupportedTypes] = Json.object15("AllTypes")(SupportedTypes.apply)(
     "int"            -> member(Json.int, _.int),
     "long"           -> member(Json.long, _.long),
     "double"         -> member(Json.double, _.double),
     "float"          -> member(Json.float, _.float),
     "string"         -> member(Json.string, _.string),
     "boolean"        -> member(Json.bool, _.boolean),
-    "uuid"           -> member(Json.uuid, _.uuid),
     "option"         -> member(Json.option(Json.int), _.option),
     "list"           -> member(Json.list(Json.int), _.list),
     "vector"         -> member(Json.vector(Json.int), _.vector),
@@ -128,4 +126,62 @@ object DomainResponse {
   def success[A](value: Json[A]): Json[Success[A]] = Json.object1("Success")(Success[A](_))("value" -> member(value, _.value))
   val badRequest: Json[BadRequest] = Json.object1("BadRequest")(BadRequest.apply)("error"           -> member(Json.string, _.error))
   val notFound: Json[NotFound] = Json.object1("NotFound")(NotFound.apply)("error"                   -> member(Json.string, _.error))
+}
+
+trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPrimitives {
+
+  val userId: Path[Refined[Long, Positive]] = segment("userId", _.long.refined[Positive])
+  val authInfo: HttpRequestHeaders[AuthInfo] = (requestHeader("X-Token", _.int.refined[Positive]) ~ requestHeader("X-ValidTill", _.long.refined[Positive])).as[AuthInfo]
+  val color: Path[Color] = segment(
+    "color",
+    _.string.pmap(c => Attempt.fromOption(Color.fromString(c), s"The `$c` is not part of the Color enumeration (${Color.all.mkString(" | ")})"))(_.name)
+  )
+
+  def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
+    anyOf
+      .opt(response(HttpStatus.Ok, "Response in case of success", entity = jsonResponse(DomainResponse.success(value))))
+      .opt(response(HttpStatus.NotFound, "Response in case of the entity was not found", entity = jsonResponse(DomainResponse.notFound)))
+      .opt(response(HttpStatus.BadRequest, "Response in case of the request body or parameters were in correct", entity = jsonResponse(DomainResponse.badRequest)))
+      .as[DomainResponse[A]]
+
+  val userRegister =
+    endpoint(
+      request(HttpMethod.POST, path / "users" / "register", entity = jsonRequest(RegisterUser.json)),
+      response(HttpStatus.Ok, "Response in case of success", entity = jsonResponse(Json.string)),
+      EndpointCategory.users,
+      "Endpoint for registration of users"
+    )
+
+  val userList =
+    endpoint(
+      request(HttpMethod.GET, path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]),
+      response(HttpStatus.Ok, "Response in case of success", entity = jsonResponse(Json.list(User.json))),
+      EndpointCategory.users,
+      "Endpoint for listing users"
+    )
+
+  val userGet =
+    endpoint(
+      request(HttpMethod.GET, path / "users" / userId, authInfo),
+      domainResponse(User.json),
+      EndpointCategory.users,
+      "Endpoint for getting a specific users"
+    )
+
+  val userDelete =
+    endpoint(
+      request(HttpMethod.DELETE, path / "users" / userId / color),
+      response(HttpStatus.Ok, "Response in case of deletion", entity = jsonResponse(Json.string)),
+      EndpointCategory.users,
+      "Endpoint for deleting users"
+    )
+
+  sealed abstract class EndpointCategory(val value: String)
+  object EndpointCategory {
+    case object Users extends EndpointCategory("Users")
+
+    def users: EndpointCategory = Users
+
+    implicit val show: Show[EndpointCategory] = Show.show(_.value)
+  }
 }

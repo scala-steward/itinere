@@ -25,6 +25,8 @@ object Boilerplate {
     GenCirceDecoder
   )
 
+  val openapiTemplates: Seq[Template] = Seq(GenToJsonSchemaFormatN)
+
   val header = "// auto-generated boilerplate" // TODO: put something meaningful here?
 
   def gen(templates: Seq[Template])(dir: File) = for (t <- templates) yield {
@@ -211,6 +213,34 @@ object Boilerplate {
              |@silent
              |trait CirceDecoderObjectN { self: JsonAlgebra[Decoder] =>
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Decoder[Z] = Decoder.forProduct$arity($applies)(f)($implicits)
+             |}
+             |
+      """
+    }
+  }
+
+  object GenToJsonSchemaFormatN extends Template {
+    def filename(root: File) = root / "itinere" / "openapi" / "ToJsonSchemaFormatN.scala"
+
+    def content(tv: TemplateVals) = {
+      import tv._
+
+      val params = synTypes map { tpe =>
+        s"param$tpe: (String, Member[ToJsonSchema, $tpe, Z])"
+      } mkString ", "
+      val applies = synTypes map { tpe =>
+        s"param$tpe._1 -> param$tpe._2.fa.schema"
+      } mkString ", "
+
+      block"""
+             |package itinere.openapi
+             |
+             |import com.github.ghik.silencer.silent
+             |import itinere._
+             |
+             |@silent
+             |trait ToJsonSchemaFormatN { self: JsonAlgebra[ToJsonSchema] =>
+             -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params):ToJsonSchema[Z] = ToJsonSchema.create(JsonSchema.obj(name, Map($applies)))
              |}
              |
       """

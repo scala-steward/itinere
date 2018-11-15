@@ -1,7 +1,5 @@
 package itinere
 
-import java.util.UUID
-
 import cats.Invariant
 import shapeless.CNil
 
@@ -10,13 +8,9 @@ trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Par
   def float(bound: Range): F[Float]
   def double(bound: Range): F[Double]
   def long(bound: Range): F[Long]
-
   def string(description: StringDescriptor): F[String]
   val bool: F[Boolean]
   val cnil: F[CNil]
-
-  val uuid: F[UUID]
-
   def option[A](from: F[A]): F[Option[A]]
   def list[A](of: F[A]): F[List[A]]
   def set[A](of: F[A]): F[Set[A]]

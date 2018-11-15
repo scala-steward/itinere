@@ -4,8 +4,6 @@ import cats.Show
 import cats.effect.{IO, Sync}
 import cats.implicits._
 import eu.timepit.refined._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
 import io.circe.literal._
 import io.circe.Error
 import itinere.circe.CirceJsonLike
@@ -93,7 +91,7 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
         val resp = serve(delete(Uri.uri("/users/1/red")))
 
         resp must returnStatus(Status.Ok)
-        resp.as[String] must returnValue("")
+        resp.as[String] must returnValue(""""Deleted user 1"""")
       }
 
       "return http 400 bad_request when invalid is given" >> {
@@ -145,36 +143,6 @@ class Http4sServerSpec extends org.specs2.mutable.Specification with IOMatchers 
   }
 }
 
-trait Endpoints extends HttpEndpointAlgebra with HttpJsonAlgebra with RefinedPrimitives {
-
-  val userId: Path[Refined[Long, Positive]] = segment("userId", _.long.refined[Positive])
-  val authInfo: HttpRequestHeaders[AuthInfo] = (requestHeader("X-Token", _.int.refined[Positive]) ~ requestHeader("X-ValidTill", _.long.refined[Positive])).as[AuthInfo]
-  val color: Path[Color] = segment(
-    "color",
-    _.string.pmap(c => Attempt.fromOption(Color.fromString(c), s"The `$c` is not part of the Color enumeration (${Color.all.mkString(" | ")})"))(_.name)
-  )
-
-  def domainResponse[A](value: Json[A]): HttpResponse[DomainResponse[A]] =
-    coproductResponseBuilder
-      .add(response(HttpStatus.Ok, entity = jsonResponse(DomainResponse.success(value))))
-      .add(response(HttpStatus.NotFound, entity = jsonResponse(DomainResponse.notFound)))
-      .add(response(HttpStatus.BadRequest, entity = jsonResponse(DomainResponse.badRequest)))
-      .as[DomainResponse[A]]
-
-  val userRegister =
-  POST(path / "users" / "register", entity = jsonRequest(RegisterUser.json)) ~>
-  response(HttpStatus.Ok, entity = jsonResponse(Json.string))
-
-  val userList =
-  GET(path / "users" /? (qs("ageGreater", _.int.refined[Positive]) & qs[String]("nameStartsWith", _.string)).as[ListFilter]) ~>
-  response(HttpStatus.Ok, entity = jsonResponse(Json.list(User.json)))
-
-  val userGet = GET(path / "users" / userId, authInfo) ~> domainResponse(User.json)
-
-  val userDelete = DELETE(path / "users" / userId / color) ~> response(HttpStatus.Ok)
-
-}
-
 object AppService {
   import org.http4s.dsl.io._
 
@@ -193,7 +161,7 @@ object Server extends Http4sServer with Endpoints with Http4sServerJson with Cir
   val routes =
   userRegister.implementedBy(r => IO.pure(r.name.value)) <+>
   userList.implementedBy(_ => IO.pure(List.empty)) <+>
-  userDelete.implementedBy(_ => IO.pure(HNil)) <+>
-  userGet.implementedBy { case uid :: _ :: _ => IO.pure(if (uid.value == 1l) DomainResponse.Success(User(uid, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
+  userDelete.implementedBy { case uid :: _ :: _ => IO.pure(s"Deleted user ${uid.value}") } <+>
+  userGet.implementedBy { case uid :: _ :: _    => IO.pure(if (uid.value == 1l) DomainResponse.Success(User(uid, "Klaas", refineMV(3))) else DomainResponse.NotFound("User was not found")) }
 
 }
