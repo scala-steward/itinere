@@ -11,6 +11,15 @@ class RefinedSpec extends org.specs2.mutable.Specification with Matchers with Ci
 
   "Refinement types" >> {
     "string" >> {
+
+      "notEmpty" >> {
+        val json = Json.string.notEmpty
+
+        "error" >> assertError(json, json"""""""", "Predicate isEmpty() did not fail.")
+        "success" >> assertSuccess(json, json""""H"""")(refineMV("H"))
+        "schema" >> assertSchema(json, JsonSchema.str(StringDescriptor.Length(LengthBound.Atleast(1))))
+      }
+
       "minLength" >> {
         val json = Json.string.minLength[W.`3`.T]
 

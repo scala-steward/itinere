@@ -1,6 +1,7 @@
 package itinere
 
 import cats.Show
+import cats.data.NonEmptyList
 import eu.timepit.refined._
 import eu.timepit.refined.string._
 import eu.timepit.refined.numeric._
@@ -55,6 +56,7 @@ final case class SupportedTypes(
   vector: Vector[Int],
   set: Set[Int],
   seq: Seq[Int],
+  nel: NonEmptyList[Int],
   either: Either[Int, String],
   color: Color,
   userId: UserId,
@@ -63,7 +65,7 @@ final case class SupportedTypes(
 
 object SupportedTypes {
 
-  val json: Json[SupportedTypes] = Json.object15("AllTypes")(SupportedTypes.apply)(
+  val json: Json[SupportedTypes] = Json.object16("AllTypes")(SupportedTypes.apply)(
     "int"            -> member(Json.int, _.int),
     "long"           -> member(Json.long, _.long),
     "double"         -> member(Json.double, _.double),
@@ -75,6 +77,7 @@ object SupportedTypes {
     "vector"         -> member(Json.vector(Json.int), _.vector),
     "set"            -> member(Json.set(Json.int), _.set),
     "seq"            -> member(Json.seq(Json.int), _.seq),
+    "nel"            -> member(Json.nel(Json.int), _.nel),
     "either"         -> member(Json.or(Json.int, Json.string), _.either),
     "color"          -> member(Color.json, _.color),
     "userId"         -> member(UserId.json, _.userId),

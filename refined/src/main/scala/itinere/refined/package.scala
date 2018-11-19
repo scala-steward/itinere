@@ -1,7 +1,8 @@
 package itinere
 
 import eu.timepit.refined.api.{RefType, Refined, Validate}
-import eu.timepit.refined.collection.{MaxSize, MinSize, Size}
+import eu.timepit.refined.boolean.Not
+import eu.timepit.refined.collection.{Empty, MaxSize, MinSize, Size}
 import eu.timepit.refined.numeric.Interval.{ClosedOpen, OpenClosed}
 import eu.timepit.refined.numeric.{Interval, Negative, Positive}
 import eu.timepit.refined.string.MatchesRegex
@@ -47,6 +48,9 @@ package object refined {
         override def apply[F[_]: JsonAlgebra]: F[Refined[String, P]] =
           JsonAlgebra[F].pmap(JsonAlgebra[F].string(desc))(p => Attempt.fromEither(R.refine(p)))(R.unwrap)
       }
+
+    def notEmpty(implicit V: Validate[String, Not[Empty]], R: RefType[Refined]): Json[String Refined Not[Empty]] =
+      withRefined(StringDescriptor.Length(LengthBound.Atleast(1)))
 
     def matchesRegex[S <: String](implicit V: Validate.Plain[String, MatchesRegex[S]], R: RefType[Refined], WS: Witness.Aux[S]): Json[String Refined MatchesRegex[S]] =
       withRefined(StringDescriptor.Pattern(WS.value))

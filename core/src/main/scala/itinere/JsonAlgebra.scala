@@ -1,6 +1,7 @@
 package itinere
 
 import cats.Invariant
+import cats.data.NonEmptyList
 import shapeless.CNil
 
 trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Partial[F] with CoCartesian[F] {
@@ -16,6 +17,7 @@ trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Par
   def set[A](of: F[A]): F[Set[A]]
   def vector[A](of: F[A]): F[Vector[A]]
   def seq[A](of: F[A]): F[Seq[A]]
+  def nel[A](of: F[A]): F[NonEmptyList[A]]
 }
 
 object JsonAlgebra {

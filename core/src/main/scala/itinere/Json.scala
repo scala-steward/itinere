@@ -1,6 +1,7 @@
 package itinere
 
 import cats.Invariant
+import cats.data.NonEmptyList
 import shapeless.{:+:, CNil, Coproduct, Inl, Inr}
 
 trait Json[A] {
@@ -63,6 +64,10 @@ object Json extends JsonDslFormatN { self =>
 
   def seq[A](of: Json[A]): Json[Seq[A]] = new Json[Seq[A]] {
     override def apply[F[_]: JsonAlgebra]: F[Seq[A]] = implicitly[JsonAlgebra[F]].seq(of.apply[F])
+  }
+
+  def nel[A](of: Json[A]): Json[NonEmptyList[A]] = new Json[NonEmptyList[A]] {
+    override def apply[F[_]: JsonAlgebra]: F[NonEmptyList[A]] = implicitly[JsonAlgebra[F]].nel(of.apply[F])
   }
 
   def or[A, B](fa: Json[A], fb: Json[B]): Json[Either[A, B]] = new Json[Either[A, B]] {

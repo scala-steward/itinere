@@ -258,6 +258,7 @@ object ToJsonSchema {
     override def pmap[A, B](fa: ToJsonSchema[A])(f: A => Attempt[B])(g: B => A): ToJsonSchema[B] = new ToJsonSchema[B] { override def schema: JsonSchema.Type = fa.schema }
     override def sum[A, B](fa: ToJsonSchema[A], fb: ToJsonSchema[B]): ToJsonSchema[Either[A, B]] = create(JsonSchema.anyOf(NonEmptyList.of(fa.schema, fb.schema)))
     override def imap[A, B](fa: ToJsonSchema[A])(f: A => B)(g: B => A): ToJsonSchema[B] = new ToJsonSchema[B] { override def schema: JsonSchema.Type = fa.schema }
+    override def nel[A](of: ToJsonSchema[A]): ToJsonSchema[NonEmptyList[A]] = create(JsonSchema.array(LengthBound.Atleast(1), false, of.schema))
   }
 }
 

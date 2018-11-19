@@ -1,7 +1,7 @@
 package itinere.http4s_server
+import cats.Monad
 import cats.data.OptionT
 import cats.effect.Sync
-import cats.{Eq, Monad}
 import org.http4s.Uri
 
 final case class RequestMessage[A](method: String, uri: String, value: A)
@@ -52,8 +52,6 @@ trait UriDecoder[A] {
 }
 
 object UriDecoder {
-
-  implicit def eq[A]: Eq[UriDecoder[A]] = Eq.allEqual
 
   implicit val monad: Monad[UriDecoder] = new Monad[UriDecoder] {
     override def pure[A](x: A): UriDecoder[A] = new UriDecoder[A] {

@@ -1,5 +1,6 @@
 package itinere.circe
 
+import cats.data.NonEmptyList
 import cats.implicits._
 import io.circe.{Decoder, Encoder}
 import itinere._
@@ -37,6 +38,8 @@ trait CirceJsonLike extends JsonLike {
     override def imap[A, B](fa: Decoder[A])(f: A => B)(g: B => A): Decoder[B] = fa.map(f)
 
     override def sum[A, B](fa: Decoder[A], fb: Decoder[B]): Decoder[Either[A, B]] = fa.map(Left.apply) or fb.map(Right.apply)
+
+    override def nel[A](of: Decoder[A]): Decoder[NonEmptyList[A]] = Decoder.decodeNonEmptyList(of)
   }
 
   private implicit val encoder: JsonAlgebra[Encoder] = new JsonAlgebra[Encoder] with CirceEncoderObjectN {
@@ -78,6 +81,8 @@ trait CirceJsonLike extends JsonLike {
         case Right(right) => fb(right)
       }
     }
+
+    override def nel[A](of: Encoder[A]): Encoder[NonEmptyList[A]] = Encoder.encodeNonEmptyList(of)
   }
 
   override def jsonDecoder[A](json: Json[A]): FromJson[A] = new FromJson[A] {

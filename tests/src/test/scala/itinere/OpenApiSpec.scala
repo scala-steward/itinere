@@ -1,7 +1,7 @@
 package itinere
 
 import io.circe.Printer
-import itinere.openapi.{JsonSchema, OpenApiGen, OpenApiGenJson, OpenApiInfo, OpenApiRoot, OpenApiServer, ToJsonSchema, Json => J}
+import itinere.openapi.{JsonF, JsonSchema, OpenApiGen, OpenApiGenJson, OpenApiInfo, OpenApiRoot, OpenApiServer, ToJsonSchema, Json => J}
 import org.specs2.matcher.Matchers
 import org.specs2.mutable.Specification
 import qq.droste._
@@ -254,6 +254,19 @@ class OpenApiSpec extends Specification with Matchers {
             )
           ),
           "boolean" -> J.obj("type" -> J.fromString("boolean")),
+          "nel" -> J.obj(
+            "type"        -> J.fromString("array"),
+            "uniqueItems" -> J.fromBoolean(false),
+            "items" -> J.obj(
+              "exclusiveMaximum" -> J.fromBoolean(false),
+              "type"             -> J.fromString("integer"),
+              "maximum"          -> J.fromBigDecimal(BigDecimal("2147483647")),
+              "exclusiveMinimum" -> J.fromBoolean(false),
+              "format"           -> J.fromString("int32"),
+              "minimum"          -> J.fromBigDecimal(BigDecimal("-2147483648"))
+            ),
+            "minItems" -> J.fromBigDecimal(BigDecimal("1"))
+          ),
           "int" -> J.obj(
             "exclusiveMaximum" -> J.fromBoolean(false),
             "type"             -> J.fromString("integer"),
@@ -384,6 +397,7 @@ class OpenApiSpec extends Specification with Matchers {
             J.fromString("vector"),
             J.fromString("int"),
             J.fromString("float"),
+            J.fromString("nel"),
             J.fromString("string"),
             J.fromString("either"),
             J.fromString("bookingProcess"),
@@ -396,6 +410,8 @@ class OpenApiSpec extends Specification with Matchers {
           )
         )
       )
+
+      println(scheme.cata(assertionPrinter).apply(json))
 
       json must beEqualTo(expected)
 
@@ -414,14 +430,14 @@ class OpenApiSpec extends Specification with Matchers {
     }
   }
 
-//  val assertionPrinter: Algebra[JsonF, String] = Algebra {
-//    case JsonF.Object(fields) => s"J.obj(${fields.map { case (key, value) => s""""$key"""" -> value }.mkString(",")})"
-//    case JsonF.Null           => "J.nil"
-//    case JsonF.Str(value)     => s"""J.fromString("$value")"""
-//    case JsonF.Bool(value)    => s"J.fromBoolean($value)"
-//    case JsonF.Number(value)  => s"""J.fromBigDecimal(BigDecimal("$value"))"""
-//    case JsonF.Array(values)  => s"J.arr(List(${values.mkString(",")}))"
-//  }
+  val assertionPrinter: Algebra[JsonF, String] = Algebra {
+    case JsonF.Object(fields) => s"J.obj(${fields.map { case (key, value) => s""""$key"""" -> value }.mkString(",")})"
+    case JsonF.Null           => "J.nil"
+    case JsonF.Str(value)     => s"""J.fromString("$value")"""
+    case JsonF.Bool(value)    => s"J.fromBoolean($value)"
+    case JsonF.Number(value)  => s"""J.fromBigDecimal(BigDecimal("$value"))"""
+    case JsonF.Array(values)  => s"J.arr(List(${values.mkString(",")}))"
+  }
 }
 
 object OpenApiEndpoints extends OpenApiGen with Endpoints with OpenApiGenJson
