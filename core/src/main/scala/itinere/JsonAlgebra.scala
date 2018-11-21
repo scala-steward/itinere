@@ -18,6 +18,7 @@ trait JsonAlgebra[F[_]] extends JsonAlgebraFormatN[F] with Invariant[F] with Par
   def vector[A](of: F[A]): F[Vector[A]]
   def seq[A](of: F[A]): F[Seq[A]]
   def nel[A](of: F[A]): F[NonEmptyList[A]]
+  def enum[A](all: Set[A], show: A => String): F[A]
 }
 
 object JsonAlgebra {

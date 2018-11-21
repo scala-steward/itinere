@@ -97,6 +97,7 @@ object Boilerplate {
              |
         |trait JsonAlgebraFormatN[F[_]] {
         -  def object${arity}[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): F[Z]
+        -  def discriminated${arity}[${`A..N`}, Z](objectName: String, discriminatorField: String)(f: (${`A..N`}) => Z)($params): F[Z]
              |}
       """
     }
@@ -125,39 +126,13 @@ object Boilerplate {
              |    override def apply[A](fa: Json[A]): G[A] = fa.apply[G]
              |  }
         -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Json[Z] = new Json[Z] { def apply[F[_] : JsonAlgebra]: F[Z] = implicitly[JsonAlgebra[F]].object$arity(name)(f)($applies) }
+        -  def discriminated$arity[${`A..N`}, Z](objectName: String, discriminatorField: String)(f: (${`A..N`}) => Z)($params): Json[Z] = new Json[Z] { def apply[F[_] : JsonAlgebra]: F[Z] = implicitly[JsonAlgebra[F]].discriminated$arity(objectName, discriminatorField)(f)($applies) }
              |}
              |
       """
     }
   }
 
-//  object GenJasonSchema extends Template {
-//    def filename(root: File) = root /  "jason" / "JasonSchemaObjectN.scala"
-//
-//    def content(tv: TemplateVals) = {
-//      import tv._
-//
-//      val params = synTypes map { tpe => s"param$tpe: (String, Member[JasonSchema, $tpe, Z])"} mkString ", "
-//      val applies = synTypes map { tpe => s"documented(param$tpe._1, param$tpe._2)"} mkString ", "
-//      block"""
-//             |package jason
-//             |
-//             |import matryoshka.data.Fix
-//             |
-//             |trait JasonSchemaFormatN { self: JasonAlgebra[JasonSchema] =>
-//             |  def documented[A, B](name: String, member: Member[JasonSchema, A, B]): (String, Fix[SchemaF]) =
-//             |    member.documentation match {
-//             |      case Some(doc) => name -> Fix[SchemaF](SchemaF.Documented(doc, member.typeClass.create))
-//             |      case None => name -> member.typeClass.create
-//             |    }
-//             |
-//             -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): JasonSchema[Z] = JasonSchema.create(Fix[SchemaF](SchemaF.Object(name, Map($applies))))
-//             |}
-//             |
-//      """
-//    }
-//  }
-//
   object GenCirceEncoder extends Template {
     def filename(root: File) = root / "itinere" / "circe" / "CirceEncoderObjectN.scala"
 
@@ -181,6 +156,7 @@ object Boilerplate {
              |@silent
              |trait CirceEncoderObjectN { self: JsonAlgebra[Encoder] =>
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Encoder[Z] = new Encoder[Z] { def apply(v: Z): Json = { Json.obj($applies) } }
+             -  def discriminated$arity[${`A..N`}, Z](objectName: String, discriminatorField: String)(f: (${`A..N`}) => Z)($params): Encoder[Z] = new Encoder[Z] { def apply(v: Z): Json = { Json.obj(discriminatorField -> Json.fromString(objectName), $applies) } }
              |}
              |
       """
@@ -207,12 +183,18 @@ object Boilerplate {
              |package itinere.circe
              |
              |import com.github.ghik.silencer.silent
-             |import io.circe.Decoder
+             |import io.circe.{Decoder, DecodingFailure}
              |import itinere._
+             |import cats.implicits._
              |
              |@silent
              |trait CirceDecoderObjectN { self: JsonAlgebra[Decoder] =>
+             |
+             |  private def disc(field: String, value: String) =
+             |    Decoder.instance(_.downField(field).as[String].flatMap(d => if(d.equalsIgnoreCase(value)) Right(()) else Left(DecodingFailure(s"Did not match expected discriminator", Nil))))
+             |
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params): Decoder[Z] = Decoder.forProduct$arity($applies)(f)($implicits)
+             -  def discriminated$arity[${`A..N`}, Z](objectName: String, discriminatorField: String)(f: (${`A..N`}) => Z)($params): Decoder[Z] = disc(discriminatorField, objectName) *> Decoder.forProduct$arity($applies)(f)($implicits)
              |}
              |
       """
@@ -241,6 +223,7 @@ object Boilerplate {
              |@silent
              |trait ToJsonSchemaFormatN { self: JsonAlgebra[ToJsonSchema] =>
              -  def object$arity[${`A..N`}, Z](name: String)(f: (${`A..N`}) => Z)($params):ToJsonSchema[Z] = ToJsonSchema.create(JsonSchema.obj(name, Map($applies)))
+             -  def discriminated$arity[${`A..N`}, Z](objectName: String, discriminatorField: String)(f: (${`A..N`}) => Z)($params):ToJsonSchema[Z] = ToJsonSchema.create(JsonSchema.obj(objectName, Map(discriminatorField -> JsonSchema.enum(Set(objectName)), $applies)))
              |}
              |
       """

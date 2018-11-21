@@ -70,6 +70,10 @@ object Json extends JsonDslFormatN { self =>
     override def apply[F[_]: JsonAlgebra]: F[NonEmptyList[A]] = implicitly[JsonAlgebra[F]].nel(of.apply[F])
   }
 
+  def enum[A](all: Set[A], show: A => String): Json[A] = new Json[A] {
+    override def apply[F[_]: JsonAlgebra]: F[A] = implicitly[JsonAlgebra[F]].enum(all, show)
+  }
+
   def or[A, B](fa: Json[A], fb: Json[B]): Json[Either[A, B]] = new Json[Either[A, B]] {
     override def apply[F[_]: JsonAlgebra]: F[Either[A, B]] = implicitly[JsonAlgebra[F]].sum(fa.apply[F], fb.apply[F])
   }

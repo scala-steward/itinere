@@ -32,6 +32,7 @@ object LengthBound {
   case object Unbounded extends LengthBound
   case class Atmost(value: Int) extends LengthBound
   case class Atleast(value: Int) extends LengthBound
+  case class Exact(value: Int) extends LengthBound
   case class Interval(low: Int, high: Int) extends LengthBound
 }
 

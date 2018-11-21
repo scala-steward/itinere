@@ -259,6 +259,7 @@ object ToJsonSchema {
     override def sum[A, B](fa: ToJsonSchema[A], fb: ToJsonSchema[B]): ToJsonSchema[Either[A, B]] = create(JsonSchema.anyOf(NonEmptyList.of(fa.schema, fb.schema)))
     override def imap[A, B](fa: ToJsonSchema[A])(f: A => B)(g: B => A): ToJsonSchema[B] = new ToJsonSchema[B] { override def schema: JsonSchema.Type = fa.schema }
     override def nel[A](of: ToJsonSchema[A]): ToJsonSchema[NonEmptyList[A]] = create(JsonSchema.array(LengthBound.Atleast(1), false, of.schema))
+    override def enum[A](all: Set[A], show: A => String): ToJsonSchema[A] = create(JsonSchema.enum(all.map(show)))
   }
 }
 
@@ -315,6 +316,7 @@ object JsonSchemaF {
   final case class Number[A](range: itinere.Range, numberType: NumberType) extends JsonSchemaF[A]
   final case class Integer[A](range: itinere.Range, integerType: IntegerType) extends JsonSchemaF[A]
   final case class Bool[A]() extends JsonSchemaF[A]
+  final case class Enum[A](options: Set[String]) extends JsonSchemaF[A]
   final case class Nil[A]() extends JsonSchemaF[A]
 
   implicit val instance: Traverse[JsonSchemaF] = new DefaultTraverse[JsonSchemaF] with TraverseMap {
@@ -327,6 +329,7 @@ object JsonSchemaF {
       case JsonSchemaF.Str(stringDescriptor)                   => G.pure(JsonSchemaF.Str(stringDescriptor))
       case JsonSchemaF.Number(range, numberType)               => G.pure(JsonSchemaF.Number(range, numberType))
       case JsonSchemaF.Integer(range, integerType)             => G.pure(JsonSchemaF.Integer(range, integerType))
+      case JsonSchemaF.Enum(options)                           => G.pure(JsonSchemaF.Enum(options))
       case JsonSchemaF.Bool()                                  => G.pure(JsonSchemaF.Bool())
       case JsonSchemaF.Nil()                                   => G.pure(JsonSchemaF.Nil())
     }
@@ -339,6 +342,8 @@ object JsonSchema {
 
   def anyOf(choices: NonEmptyList[Type]): Type =
     Fix[JsonSchemaF](JsonSchemaF.AnyOf(choices))
+  def enum(opts: Set[String]): Type =
+    Fix[JsonSchemaF](JsonSchemaF.Enum(opts))
   def ref(id: String): Type =
     Fix[JsonSchemaF](JsonSchemaF.Ref(id))
   def obj(name: String, fields: Map[String, Type]): Type =
@@ -402,6 +407,8 @@ object JsonSchema {
   def toJson(jsonSchema: JsonSchema.Type): Json.Type = {
 
     def lengthBoundToJson(lowField: String, highField: String, bound: LengthBound) = bound match {
+      case LengthBound.Exact(value) =>
+        List(lowField -> Json.fromInt(value), highField -> Json.fromInt(value))
       case LengthBound.Atleast(low) =>
         List(lowField -> Json.fromInt(low))
       case LengthBound.Atmost(high) =>
@@ -425,6 +432,8 @@ object JsonSchema {
         Json.obj(
           List("type" -> Json.fromString("array"), "uniqueItems" -> Json.fromBoolean(uniqueItems), "items" -> schema) ++ lengthBoundToJson("minItems", "maxItems", lengthBound): _*
         )
+      case JsonSchemaF.Enum(options) =>
+        Json.obj("type" -> Json.fromString("string"), "enum" -> Json.arr(options.map(Json.fromString).toList))
       case JsonSchemaF.Ref(id) =>
         Json.obj("$ref" -> Json.fromString(s"#/components/schemas/$id"))
       case JsonSchemaF.Bool() =>

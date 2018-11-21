@@ -226,6 +226,7 @@ class OpenApiSpec extends Specification with Matchers {
       val expected = J.obj(
         "type" -> J.fromString("object"),
         "properties" -> J.obj(
+          "colorEnum" -> J.obj("type" -> J.fromString("string"), "enum" -> J.arr(List(J.fromString("green"), J.fromString("red")))),
           "either" -> J.obj(
             "anyOf" -> J.arr(
               List(
@@ -283,7 +284,6 @@ class OpenApiSpec extends Specification with Matchers {
             "format"           -> J.fromString("int64"),
             "minimum"          -> J.fromBigDecimal(BigDecimal("-9223372036854775808"))
           ),
-          "color" -> J.obj("type" -> J.fromString("string")),
           "set" -> J.obj(
             "type"        -> J.fromString("array"),
             "uniqueItems" -> J.fromBoolean(true),
@@ -348,6 +348,7 @@ class OpenApiSpec extends Specification with Matchers {
             "format"           -> J.fromString("int32"),
             "minimum"          -> J.fromBigDecimal(BigDecimal("-2147483648"))
           ),
+          "colorPmap" -> J.obj("type" -> J.fromString("string")),
           "double" -> J.obj(
             "exclusiveMaximum" -> J.fromBoolean(false),
             "type"             -> J.fromString("number"),
@@ -355,6 +356,42 @@ class OpenApiSpec extends Specification with Matchers {
             "exclusiveMinimum" -> J.fromBoolean(false),
             "format"           -> J.fromString("double"),
             "minimum"          -> J.fromBigDecimal(BigDecimal("-1.7976931348623157E+308"))
+          ),
+          "register" -> J.obj(
+            "anyOf" -> J.arr(
+              List(
+                J.obj(
+                  "type" -> J.fromString("object"),
+                  "properties" -> J.obj(
+                    "_type" -> J.obj("type" -> J.fromString("string"), "enum" -> J.arr(List(J.fromString("Admin")))),
+                    "at" -> J.obj(
+                      "exclusiveMaximum" -> J.fromBoolean(false),
+                      "type"             -> J.fromString("integer"),
+                      "maximum"          -> J.fromBigDecimal(BigDecimal("9223372036854775807")),
+                      "exclusiveMinimum" -> J.fromBoolean(false),
+                      "format"           -> J.fromString("int64"),
+                      "minimum"          -> J.fromBigDecimal(BigDecimal("-9223372036854775808"))
+                    )
+                  ),
+                  "required" -> J.arr(List(J.fromString("_type"), J.fromString("at")))
+                ),
+                J.obj(
+                  "type" -> J.fromString("object"),
+                  "properties" -> J.obj(
+                    "_type" -> J.obj("type" -> J.fromString("string"), "enum" -> J.arr(List(J.fromString("User")))),
+                    "at" -> J.obj(
+                      "exclusiveMaximum" -> J.fromBoolean(false),
+                      "type"             -> J.fromString("integer"),
+                      "maximum"          -> J.fromBigDecimal(BigDecimal("9223372036854775807")),
+                      "exclusiveMinimum" -> J.fromBoolean(false),
+                      "format"           -> J.fromString("int64"),
+                      "minimum"          -> J.fromBigDecimal(BigDecimal("-9223372036854775808"))
+                    )
+                  ),
+                  "required" -> J.arr(List(J.fromString("_type"), J.fromString("at")))
+                )
+              )
+            )
           ),
           "string" -> J.obj("type" -> J.fromString("string")),
           "long" -> J.obj(
@@ -395,14 +432,16 @@ class OpenApiSpec extends Specification with Matchers {
             J.fromString("seq"),
             J.fromString("long"),
             J.fromString("vector"),
+            J.fromString("register"),
             J.fromString("int"),
             J.fromString("float"),
             J.fromString("nel"),
             J.fromString("string"),
             J.fromString("either"),
             J.fromString("bookingProcess"),
-            J.fromString("color"),
+            J.fromString("colorPmap"),
             J.fromString("double"),
+            J.fromString("colorEnum"),
             J.fromString("set"),
             J.fromString("boolean"),
             J.fromString("userId"),
@@ -411,7 +450,7 @@ class OpenApiSpec extends Specification with Matchers {
         )
       )
 
-      println(scheme.cata(assertionPrinter).apply(json))
+//      println(scheme.cata(assertionPrinter).apply(json))
 
       json must beEqualTo(expected)
 

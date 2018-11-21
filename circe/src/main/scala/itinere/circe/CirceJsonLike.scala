@@ -39,7 +39,16 @@ trait CirceJsonLike extends JsonLike {
 
     override def sum[A, B](fa: Decoder[A], fb: Decoder[B]): Decoder[Either[A, B]] = fa.map(Left.apply) or fb.map(Right.apply)
 
-    override def nel[A](of: Decoder[A]): Decoder[NonEmptyList[A]] = Decoder.decodeNonEmptyList(of)
+    override def nel[A](of: Decoder[A]): Decoder[NonEmptyList[A]] =
+      Decoder.decodeNonEmptyList(of)
+
+    override def enum[A](all: Set[A], show: A => String): Decoder[A] =
+      Decoder.decodeString.emap(
+        str =>
+          all
+            .find(x => show(x).equalsIgnoreCase(str))
+            .fold[Either[String, A]](Left(s"The given `$str` was not part of (${all.map(show).mkString(" | ")})"))(Right.apply)
+      )
   }
 
   private implicit val encoder: JsonAlgebra[Encoder] = new JsonAlgebra[Encoder] with CirceEncoderObjectN {
@@ -83,6 +92,8 @@ trait CirceJsonLike extends JsonLike {
     }
 
     override def nel[A](of: Encoder[A]): Encoder[NonEmptyList[A]] = Encoder.encodeNonEmptyList(of)
+
+    override def enum[A](all: Set[A], show: A => String): Encoder[A] = Encoder.encodeString.contramap(show)
   }
 
   override def jsonDecoder[A](json: Json[A]): FromJson[A] = new FromJson[A] {

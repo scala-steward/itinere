@@ -51,6 +51,22 @@ class RefinedSpec extends org.specs2.mutable.Specification with Matchers with Ci
 
       }
 
+      "exactSize" >> {
+        val json = Json.string.exactSize[W.`3`.T]
+
+        "error" >> assertError(json, json""""Bo"""", "Predicate taking size(Bo) = 2 failed: Predicate failed: (2 == 3).")
+        "success" >> assertSuccess(json, json""""Jos"""")(refineMV("Jos"))
+        "schema" >> assertSchema(json, JsonSchema.str(StringDescriptor.Length(LengthBound.Exact(3))))
+      }
+
+      "url" >> {
+        val json = Json.string.url
+
+        "error" >> assertError(json, json""""nee"""", "Url predicate failed: no protocol: nee")
+        "success" >> assertSuccess(json, json""""http://gamer.nl"""")(refineMV("http://gamer.nl"))
+        "schema" >> assertSchema(json, JsonSchema.str(StringDescriptor.Type(StringType.Uri)))
+      }
+
       "regex" >> {
         val json = Json.string.matchesRegex[W.`"([A-Za-z]{3,5})"`.T]
 

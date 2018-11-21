@@ -3,9 +3,10 @@ package itinere
 import eu.timepit.refined.api.{RefType, Refined, Validate}
 import eu.timepit.refined.boolean.Not
 import eu.timepit.refined.collection.{Empty, MaxSize, MinSize, Size}
+import eu.timepit.refined.generic.Equal
 import eu.timepit.refined.numeric.Interval.{ClosedOpen, OpenClosed}
 import eu.timepit.refined.numeric.{Interval, Negative, Positive}
-import eu.timepit.refined.string.MatchesRegex
+import eu.timepit.refined.string.{MatchesRegex, Url}
 import shapeless.Witness
 
 package object refined {
@@ -63,6 +64,12 @@ package object refined {
 
     def sized[L <: Int, H <: Int](implicit VH: Validate[String, Size[Interval.Closed[L, H]]], L: Witness.Aux[L], H: Witness.Aux[H]): Json[Refined[String, Size[Interval.Closed[L, H]]]] =
       withRefined(StringDescriptor.Length(LengthBound.Interval(L.value, H.value)))
+
+    def exactSize[L <: Int](implicit VH: Validate[String, Size[Equal[L]]], L: Witness.Aux[L]): Json[Refined[String, Size[Equal[L]]]] =
+      withRefined(StringDescriptor.Length(LengthBound.Exact(L.value)))
+
+    def url(implicit V: Validate.Plain[String, Url], R: RefType[Refined]): Json[String Refined Url] =
+      withRefined(StringDescriptor.Type(StringType.Uri))
   }
 }
 

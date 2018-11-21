@@ -26,12 +26,25 @@ object BookingProcess {
   }
 }
 
+sealed trait Register
+object Register {
+  case class Admin(at: Long) extends Register
+  case class User(at: Long) extends Register
+
+  val json: Json[Register] = {
+    val admin = Json.discriminated1("Admin", "_type")(Admin.apply)("at" -> member(Json.long, _.at))
+    val user = Json.discriminated1("User", "_type")(User.apply)("at"    -> member(Json.long, _.at))
+
+    (admin | user).as[Register]
+  }
+}
+
 sealed abstract class Color(val name: String)
 object Color {
   case object Green extends Color("green")
   case object Red extends Color("red")
 
-  val all = Set(Green, Red)
+  val all: Set[Color] = Set(Green, Red)
 
   def fromString(str: String): Option[Color] = all.find(_.name == str.toLowerCase())
 
@@ -58,14 +71,16 @@ final case class SupportedTypes(
   seq: Seq[Int],
   nel: NonEmptyList[Int],
   either: Either[Int, String],
-  color: Color,
+  colorPmap: Color,
+  colorEnum: Color,
   userId: UserId,
-  bookingProcess: BookingProcess
+  bookingProcess: BookingProcess,
+  register: Register
 )
 
 object SupportedTypes {
 
-  val json: Json[SupportedTypes] = Json.object16("AllTypes")(SupportedTypes.apply)(
+  val json: Json[SupportedTypes] = Json.object18("AllTypes")(SupportedTypes.apply)(
     "int"            -> member(Json.int, _.int),
     "long"           -> member(Json.long, _.long),
     "double"         -> member(Json.double, _.double),
@@ -79,9 +94,11 @@ object SupportedTypes {
     "seq"            -> member(Json.seq(Json.int), _.seq),
     "nel"            -> member(Json.nel(Json.int), _.nel),
     "either"         -> member(Json.or(Json.int, Json.string), _.either),
-    "color"          -> member(Color.json, _.color),
+    "colorPmap"      -> member(Color.json, _.colorPmap),
+    "colorEnum"      -> member(Json.enum(Color.all, _.name), _.colorEnum),
     "userId"         -> member(UserId.json, _.userId),
-    "bookingProcess" -> member(BookingProcess.json, _.bookingProcess)
+    "bookingProcess" -> member(BookingProcess.json, _.bookingProcess),
+    "register"       -> member(Register.json, _.register)
   )
 }
 
