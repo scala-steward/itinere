@@ -83,6 +83,7 @@ val tests = project
   .settings(noPublishSettings)
   .settings(commonSettings("tests"))
   .settings(
+    parallelExecution in Test := false,
     libraryDependencies ++= Seq(
       "io.swagger.parser.v3" % "swagger-parser"     % "2.0.5"                       % Test,
       "org.typelevel"        %% "cats-laws"         % catsVersion                   % Test,

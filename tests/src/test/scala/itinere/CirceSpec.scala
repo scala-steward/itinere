@@ -18,7 +18,12 @@ class CirceSpec extends Specification with ScalaCheck with ArbDerivation with Ci
 
   "when supplied JSON is invalid, throw descriptive error" >> {
     jsonDecoder(Register.json).decode(json"""{"_type":"Admin","at": "asdf"}""".noSpaces) must
-      beEqualTo(Attempt.error("Json decode error", Some(DecodingFailure("Tried all decoders in union. Couldn't decode any member in union, did you miss a field or provide malformed JSON?", List()))))
+    beEqualTo(
+      Attempt.error(
+        "Json decode error",
+        Some(DecodingFailure("Tried all decoders in union. Couldn't decode any member in union, did you miss a field or provide malformed JSON?", List()))
+      )
+    )
 
   }
 

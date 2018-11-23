@@ -2,24 +2,24 @@ package itinere.http4s_server
 import cats.Monad
 import cats.data.OptionT
 import cats.effect.Sync
-import org.http4s.Uri
+import org.http4s.{Method, Uri}
 
-final case class RequestMessage[A](method: String, uri: String, value: A)
+final case class Endpoint(method: String, uri: String)
+
+final case class RequestMessage[A](endpoint: Endpoint, value: A) {
+  def withValue[B](value: B): RequestMessage[B] = copy(value = value)
+}
 
 final case class UriDecodeFailure(error: String, cause: Option[Throwable]) extends Throwable(error) {
   def message: String = cause.fold(error)(exception => s"$error : ${exception.getMessage}")
 }
 
-final case class HeaderDecodeFailure(error: String, cause: Option[Throwable]) extends Throwable(error) {
-  def message: String = cause.fold(error)(exception => s"$error : ${exception.getMessage}")
-}
-
 sealed trait UriDecodeResult[+A] { self =>
 
-  def toOptionT[F[_], B >: A](implicit F: Sync[F]): OptionT[F, B] = self match {
-    case UriDecodeResult.Matched(result, uri, _) => if (uri.path == "") OptionT.pure[F](result) else OptionT.none[F, B]
-    case UriDecodeResult.Fatal(err, cause)       => OptionT.liftF[F, B](F.raiseError(UriDecodeFailure(err, cause)))
-    case UriDecodeResult.NoMatch                 => OptionT.none[F, B]
+  def toOptionT[F[_], B >: A](method: Method)(implicit F: Sync[F]): OptionT[F, RequestMessage[B]] = self match {
+    case UriDecodeResult.Matched(result, uri, segments) => if (uri.path == "") OptionT.pure[F](RequestMessage(Endpoint(method.name, segments.mkString("/")), result)) else OptionT.none[F, RequestMessage[B]]
+    case UriDecodeResult.Fatal(err, cause)              => OptionT.liftF[F, RequestMessage[B]](F.raiseError(UriDecodeFailure(err, cause)))
+    case UriDecodeResult.NoMatch                        => OptionT.none[F, RequestMessage[B]]
   }
 
   def map[B](f: A => B): UriDecodeResult[B] = self match {
@@ -32,12 +32,6 @@ sealed trait UriDecodeResult[+A] { self =>
     case UriDecodeResult.Matched(result, remainder, existing) => UriDecodeResult.Matched(result, remainder, segments ::: existing)
     case UriDecodeResult.NoMatch                              => UriDecodeResult.NoMatch
     case UriDecodeResult.Fatal(error, cause)                  => UriDecodeResult.Fatal(error, cause)
-  }
-
-  def matchedSegments: List[String] = self match {
-    case UriDecodeResult.Matched(_, _, segments) => segments
-    case UriDecodeResult.NoMatch                 => Nil
-    case UriDecodeResult.Fatal(_, _)             => Nil
   }
 }
 
