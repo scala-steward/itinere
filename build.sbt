@@ -186,7 +186,7 @@ def commonSettings(n: String) = Seq(
     "-Ywarn-value-discard" // Warn when non-Unit expression results are unused.
   ),
   scalacOptions in (Compile, console) --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
-  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.8")
+  addCompilerPlugin("org.spire-math" %% "kind-projector" % "0.9.9")
 )
 
 def publishSettings = Seq(
