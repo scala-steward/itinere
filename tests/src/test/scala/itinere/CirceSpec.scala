@@ -1,5 +1,7 @@
 package itinere
+import io.circe.DecodingFailure
 import itinere.circe._
+import io.circe.literal._
 import org.scalacheck.{Arbitrary, Gen}
 import org.specs2.ScalaCheck
 import org.specs2.matcher.Matchers
@@ -12,6 +14,12 @@ class CirceSpec extends Specification with ScalaCheck with ArbDerivation with Ci
 
   "must preserve symmetry when encode and decode" >> prop { t: SupportedTypes =>
     decoder.decode(encoder.encode(t)) must beEqualTo(Attempt.success(t))
+  }
+
+  "when supplied JSON is invalid, throw descriptive error" >> {
+    jsonDecoder(Register.json).decode(json"""{"_type":"Admin","at": "asdf"}""".noSpaces) must
+      beEqualTo(Attempt.error("Json decode error", Some(DecodingFailure("Tried all decoders in union. Couldn't decode any member in union, did you miss a field or provide malformed JSON?", List()))))
+
   }
 
   /** Parameters to configure scalacheck generators */

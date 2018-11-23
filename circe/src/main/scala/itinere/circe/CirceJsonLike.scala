@@ -21,7 +21,7 @@ trait CirceJsonLike extends JsonLike {
 
     override val bool: Decoder[Boolean] = Decoder.decodeBoolean
 
-    override val cnil: Decoder[CNil] = Decoder.const(null)
+    override val cnil: Decoder[CNil] = Decoder.failedWithMessage("Tried all decoders in union. Couldn't decode any member in union, did you miss a field or provide malformed JSON?")
 
     override def option[A](from: Decoder[A]): Decoder[Option[A]] = Decoder.decodeOption(from)
 
