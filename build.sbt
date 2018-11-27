@@ -58,7 +58,7 @@ val `openapi` = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.higherkindness" %% "droste-core" % "0.5.0"
+      "io.higherkindness" %% "droste-core" % "0.6.0"
     ),
     coverageExcludedPackages := "itinere.openapi.*FormatN",
     sourceGenerators in Compile += (sourceManaged in Compile)
