@@ -1,6 +1,6 @@
 import microsites.ExtraMdFileConfig
 
-val catsVersion = "1.4.0"
+val catsVersion = "1.5.0"
 val shapelessVersion = "2.3.3"
 
 val core = project
