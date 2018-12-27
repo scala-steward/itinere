@@ -1,4 +1,4 @@
-import microsites.ExtraMdFileConfig
+import microsites.{CdnDirectives, ExtraMdFileConfig}
 
 val catsVersion = "1.5.0"
 val shapelessVersion = "2.3.3"
@@ -107,18 +107,33 @@ val docs = project
   .settings(
     scalacOptions := Seq("-language:higherKinds"),
     micrositeName := "itinere",
-    micrositeDescription := "Define endpoints",
+    micrositeDescription := "Describe HTTP REST/JSON endpoints",
     micrositeBaseUrl := "/itinere",
     micrositeDocumentationUrl := "/itinere/docs/",
     micrositeGitterChannel := false,
     micrositeGithubOwner := "vectos",
     micrositeGithubRepo := "itinere",
+    micrositePushSiteWith := GitHub4s,
     micrositeGithubToken := sys.env.get("GITHUB_TOKEN"),
     micrositeOrganizationHomepage := "http://vectos.net",
     micrositeAuthor := "Vectos",
-    micrositeTwitterCreator := "@mark_dj"
+    micrositeTwitterCreator := "@mark_dj",
+    micrositeCDNDirectives := CdnDirectives(
+      jsList = List.empty,
+      cssList = List("https://fonts.googleapis.com/css?family=Do Hyeon")
+    ),
+    micrositePalette := Map(
+      "brand-primary"   -> "#F39700",
+      "brand-secondary" -> "#000000",
+      "brand-tertiary"  -> "#1A1A1A",
+      "gray-dark"       -> "#453E46",
+      "gray"            -> "#837F84",
+      "gray-light"      -> "#E3E2E3",
+      "gray-lighter"    -> "#F4F3F4",
+      "white-color"     -> "#FFFFFF"
+    )
   )
-  .dependsOn(core, refined)
+  .dependsOn(`http4s-server`, refined, `openapi-circe`)
   .enablePlugins(MicrositesPlugin)
 
 lazy val noPublishSettings = Seq(

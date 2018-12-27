@@ -1,0 +1,24 @@
+options:
+  - title: Getting Started
+    url: docs/index.html
+
+  - title: Basics
+    url: docs/basics.html
+
+  - title: Imap, pmap and sum types
+    url: docs/richer-data-types.html
+
+  - title: Schema Registry
+    url: docs/schema-registry.html
+
+  - title: Support for refinement types
+    url: docs/refined.html
+
+  - title: Akka stream
+    url: docs/akka-stream.html
+
+  - title: Akka serializer
+    url: docs/akka-serializer.html
+
+  - title: Performance
+    url: docs/performance.html
