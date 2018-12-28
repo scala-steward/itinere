@@ -105,7 +105,7 @@ val docs = project
   .settings(noPublishSettings)
   .settings(commonSettings("docs"))
   .settings(
-    scalacOptions := Seq("-language:higherKinds"),
+    scalacOptions --= Seq("-Ywarn-unused:imports", "-Xfatal-warnings"),
     micrositeName := "itinere",
     micrositeDescription := "Describe HTTP REST/JSON endpoints",
     micrositeBaseUrl := "/itinere",
@@ -133,7 +133,7 @@ val docs = project
       "white-color"     -> "#FFFFFF"
     )
   )
-  .dependsOn(`http4s-server`, refined, `openapi-circe`)
+  .dependsOn(`http4s-server`, refined, `openapi-circe`, circe)
   .enablePlugins(MicrositesPlugin)
 
 lazy val noPublishSettings = Seq(
