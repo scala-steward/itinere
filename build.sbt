@@ -42,8 +42,8 @@ val circe = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core"   % "0.10.1",
-      "io.circe" %% "circe-parser" % "0.10.1"
+      "io.circe" %% "circe-core"   % "0.11.0",
+      "io.circe" %% "circe-parser" % "0.11.0"
     ),
     coverageExcludedPackages := "itinere.circe.*ObjectN",
     sourceGenerators in Compile += (sourceManaged in Compile)
@@ -72,7 +72,7 @@ val `openapi-circe` = project
   .settings(commonSettings("open-api-circe"))
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core" % "0.10.1"
+      "io.circe" %% "circe-core" % "0.11.0"
     ),
   )
   .settings(publishSettings)
