@@ -31,7 +31,7 @@ val `http4s-server` = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M4"
+      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M5"
     )
   )
   .dependsOn(core)
