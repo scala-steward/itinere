@@ -14,6 +14,6 @@ addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.8")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.2")
 
-addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.3.7")
+addSbtPlugin("org.wartremover" % "sbt-wartremover" % "2.4.0")
 
 addSbtPlugin("com.geirsson" % "sbt-scalafmt" % "1.5.1")
