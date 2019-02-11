@@ -8,7 +8,7 @@ addSbtPlugin("com.47deg" % "sbt-microsites" % "0.7.15")
 
 addSbtPlugin("ch.epfl.scala" % "sbt-release-early" % "2.1.1")
 
-addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.3.4")
+addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.0")
 
 addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.8")
 
