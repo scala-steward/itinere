@@ -150,8 +150,8 @@ def commonSettings(n: String) = Seq(
   scalafmtOnCompile := true,
   wartremoverErrors ++= Warts.unsafe,
   libraryDependencies ++= Seq(
-    compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.3.1"),
-    "com.github.ghik" %% "silencer-lib" % "1.3.1" % Provided
+    compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.3.2"),
+    "com.github.ghik" %% "silencer-lib" % "1.3.2" % Provided
   ),
   scalacOptions := Seq(
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
