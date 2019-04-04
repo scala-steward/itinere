@@ -31,7 +31,7 @@ val `http4s-server` = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M5"
+      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M7"
     )
   )
   .dependsOn(core)
@@ -42,8 +42,9 @@ val circe = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core"   % "0.10.1",
-      "io.circe" %% "circe-parser" % "0.10.1"
+      "org.typelevel" %% "jawn-ast"     % "0.14.1",
+      "io.circe"      %% "circe-core"   % "0.11.1",
+      "io.circe"      %% "circe-parser" % "0.11.1"
     ),
     coverageExcludedPackages := "itinere.circe.*ObjectN",
     sourceGenerators in Compile += (sourceManaged in Compile)
@@ -72,7 +73,8 @@ val `openapi-circe` = project
   .settings(commonSettings("open-api-circe"))
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core" % "0.10.1"
+      "org.typelevel" %% "jawn-ast"   % "0.14.1",
+      "io.circe"      %% "circe-core" % "0.11.1"
     ),
   )
   .settings(publishSettings)
@@ -89,9 +91,9 @@ val tests = project
       "org.typelevel"        %% "cats-laws"         % catsVersion                   % Test,
       "org.typelevel"        %% "discipline"        % "0.10.0"                      % Test,
       "com.propensive"       %% "magnolia"          % "0.10.0"                      % Test,
-      "org.http4s"           %% "http4s-circe"      % "0.20.0-M3"                   % Test,
-      "org.http4s"           %% "http4s-dsl"        % "0.20.0-M3"                   % Test,
-      "io.circe"             %% "circe-literal"     % "0.10.0"                      % Test,
+      "org.http4s"           %% "http4s-circe"      % "0.20.0-M7"                   % Test,
+      "org.http4s"           %% "http4s-dsl"        % "0.20.0-M7"                   % Test,
+      "io.circe"             %% "circe-literal"     % "0.11.1"                      % Test,
       "org.specs2"           %% "specs2-core"       % "4.3.4"                       % Test,
       "org.specs2"           %% "specs2-scalacheck" % "4.3.4"                       % Test,
       "org.specs2"           %% "specs2-cats"       % "4.3.5-78abffa2e-20181150936" % Test,
@@ -146,7 +148,7 @@ lazy val noPublishSettings = Seq(
 def commonSettings(n: String) = Seq(
   name := s"itinere-$n",
   organization := "net.vectos",
-  scalaVersion := "2.12.7",
+  scalaVersion := "2.12.8",
   scalafmtOnCompile := true,
   wartremoverErrors ++= Warts.unsafe,
   libraryDependencies ++= Seq(
