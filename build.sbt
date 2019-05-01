@@ -2,6 +2,7 @@ import microsites.{CdnDirectives, ExtraMdFileConfig}
 
 val catsVersion = "1.6.0"
 val shapelessVersion = "2.3.3"
+val http4sVersion = "0.20.0"
 
 val core = project
   .in(file("core"))
@@ -31,7 +32,7 @@ val `http4s-server` = project
   .settings(publishSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "org.http4s" %% "http4s-blaze-server" % "0.20.0-M7"
+      "org.http4s" %% "http4s-blaze-server" % http4sVersion
     )
   )
   .dependsOn(core)
@@ -91,8 +92,8 @@ val tests = project
       "org.typelevel"        %% "cats-laws"         % catsVersion                   % Test,
       "org.typelevel"        %% "discipline"        % "0.10.0"                      % Test,
       "com.propensive"       %% "magnolia"          % "0.10.0"                      % Test,
-      "org.http4s"           %% "http4s-circe"      % "0.20.0-M7"                   % Test,
-      "org.http4s"           %% "http4s-dsl"        % "0.20.0-M7"                   % Test,
+      "org.http4s"           %% "http4s-circe"      % http4sVersion                 % Test,
+      "org.http4s"           %% "http4s-dsl"        % http4sVersion                 % Test,
       "io.circe"             %% "circe-literal"     % "0.11.1"                      % Test,
       "org.specs2"           %% "specs2-core"       % "4.3.4"                       % Test,
       "org.specs2"           %% "specs2-scalacheck" % "4.3.4"                       % Test,
