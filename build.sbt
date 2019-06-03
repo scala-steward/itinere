@@ -1,6 +1,6 @@
 import microsites.{CdnDirectives, ExtraMdFileConfig}
 
-val catsVersion = "1.6.0"
+val catsVersion = "1.6.1"
 val shapelessVersion = "2.3.3"
 val http4sVersion = "0.20.1"
 
