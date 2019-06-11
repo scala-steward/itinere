@@ -23,7 +23,7 @@ val refined = project
   .in(file("refined"))
   .settings(commonSettings("refined"))
   .settings(publishSettings)
-  .settings(libraryDependencies ++= Seq("eu.timepit" %% "refined" % "0.9.7"))
+  .settings(libraryDependencies ++= Seq("eu.timepit" %% "refined" % "0.9.8"))
   .dependsOn(core)
 
 val `http4s-server` = project
