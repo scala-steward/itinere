@@ -1,6 +1,6 @@
 addSbtPlugin("org.scoverage" % "sbt-scoverage" % "1.5.1")
 
-addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.6")
+addSbtPlugin("pl.project13.scala" % "sbt-jmh" % "0.3.7")
 
 addSbtPlugin("org.foundweekends" % "sbt-bintray" % "0.5.5")
 
