@@ -10,7 +10,7 @@ addSbtPlugin("ch.epfl.scala" % "sbt-release-early" % "2.1.1")
 
 addSbtPlugin("com.timushev.sbt" % "sbt-updates" % "0.4.0")
 
-addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.8")
+addSbtPlugin("net.vonbuchholtz" % "sbt-dependency-check" % "0.2.10")
 
 addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.9.2")
 
